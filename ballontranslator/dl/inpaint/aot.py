@@ -151,11 +151,13 @@ class AOTBlock(nn.Module):
 		self.rates = rates
 		for i, rate in enumerate(rates):
 			self.__setattr__(
-				'block{}'.format(str(i).zfill(2)), 
+				f'block{str(i).zfill(2)}',
 				nn.Sequential(
 					nn.ReflectionPad2d(rate),
-					nn.Conv2d(dim, dim//4, 3, padding=0, dilation=rate),
-					nn.ReLU(True)))
+					nn.Conv2d(dim, dim // 4, 3, padding=0, dilation=rate),
+					nn.ReLU(True),
+				),
+			)
 		self.fuse = nn.Sequential(
 			nn.ReflectionPad2d(1),
 			nn.Conv2d(dim, dim, 3, padding=0, dilation=1))
@@ -241,15 +243,12 @@ class AOTGenerator(nn.Module) :
 			GatedWSConvPadded(ch, out_ch, 3, stride = 1),
 		)
 
-	def forward(self, img, mask) :
+	def forward(self, img, mask):
 		x = torch.cat([mask, img], dim = 1)
 		x = self.head(x)
 		conv = self.body_conv(x)
 		x = self.tail(conv)
-		if self.training :
-			return x
-		else :
-			return torch.clip(x, -1, 1)
+		return x if self.training else torch.clip(x, -1, 1)
 
 def load_aot_model(model_path, device) -> AOTGenerator:
     model = AOTGenerator(in_ch=4, out_ch=3, ch=32, alpha=0.0)

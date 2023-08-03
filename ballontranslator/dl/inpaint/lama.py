@@ -56,9 +56,7 @@ class ConcatTupleLayer(nn.Module):
         assert isinstance(x, tuple)
         x_l, x_g = x
         assert torch.is_tensor(x_l) or torch.is_tensor(x_g)
-        if not torch.is_tensor(x_g):
-            return x_l
-        return torch.cat(x, dim=1)
+        return x_l if not torch.is_tensor(x_g) else torch.cat(x, dim=1)
 
 
 class FFCResNetGenerator(nn.Module):
@@ -123,13 +121,11 @@ class FFCResNetGenerator(nn.Module):
         masked_img = torch.cat([img * (1 - mask), mask], dim=1)
         if rel_pos is None:
             return self.model(masked_img)
-        else:
-            
-            x_l, x_g = self.model[:2](masked_img)
-            x_l = x_l.to(torch.float32)
-            x_l += rel_pos
-            x_l += direct
-            return self.model[2:]((x_l, x_g))
+        x_l, x_g = self.model[:2](masked_img)
+        x_l = x_l.to(torch.float32)
+        x_l += rel_pos
+        x_l += direct
+        return self.model[2:]((x_l, x_g))
 
 
 class NLayerDiscriminator(nn.Module):
@@ -143,7 +139,7 @@ class NLayerDiscriminator(nn.Module):
                      nn.LeakyReLU(0.2, True)]]
 
         nf = ndf
-        for n in range(1, n_layers):
+        for _ in range(1, n_layers):
             nf_prev = nf
             nf = min(nf * 2, 512)
 
@@ -169,12 +165,12 @@ class NLayerDiscriminator(nn.Module):
         sequence += [[nn.Conv2d(nf, 1, kernel_size=kw, stride=1, padding=padw)]]
 
         for n in range(len(sequence)):
-            setattr(self, 'model'+str(n), nn.Sequential(*sequence[n]))
+            setattr(self, f'model{str(n)}', nn.Sequential(*sequence[n]))
 
     def get_all_activations(self, x):
         res = [x]
         for n in range(self.n_layers + 2):
-            model = getattr(self, 'model' + str(n))
+            model = getattr(self, f'model{str(n)}')
             res.append(model(res[-1]))
         return res[1:]
 
@@ -227,9 +223,7 @@ class MultiLabelEmbedding(nn.Module):
         nn.init.normal_(self.weight)
 
     def forward(self, input_ids):
-        # input_ids:[B,HW,4](onehot)
-        out = torch.matmul(input_ids, self.weight)  # [B,HW,dim]
-        return out
+        return torch.matmul(input_ids, self.weight)
 
 
 class MPE(nn.Module):
@@ -270,10 +264,7 @@ class LamaFourier:
                     )
         self.discriminator = NLayerDiscriminator() if build_discriminator else None
         self.inpaint_only = False
-        if use_mpe:
-            self.mpe = MPE()
-        else:
-            self.mpe = None
+        self.mpe = MPE() if use_mpe else None
 
     def train_generator(self):
         self.inpaint_only = False
@@ -357,20 +348,20 @@ class LamaFourier:
         pos_num = 128
 
         ori_mask = mask.copy()
-        ori_h, ori_w = ori_mask.shape[0:2]
+        ori_h, ori_w = ori_mask.shape[:2]
         ori_mask = ori_mask / 255
         mask = cv2.resize(mask, (str_size, str_size), interpolation=cv2.INTER_AREA)
         mask[mask > 0] = 255
-        h, w = mask.shape[0:2]
+        h, w = mask.shape[:2]
         mask3 = mask.copy()
         mask3 = 1. - (mask3 / 255.0)
         pos = np.zeros((h, w), dtype=np.int32)
         direct = np.zeros((h, w, 4), dtype=np.int32)
-        i = 0
-
         if mask3.max() > 0:
+            i = 0
+
             # otherwise it will cause infinity loop
-        
+
             while np.sum(1 - mask3) > 0:
                 i += 1
                 mask3_ = cv2.filter2D(mask3, -1, ones_filter)

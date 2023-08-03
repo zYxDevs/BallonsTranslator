@@ -13,11 +13,7 @@ def main():
     parser.add_argument("--qt-api", default='', choices=QT_APIS, help='Set qt api')
     args = parser.parse_args()
 
-    if not args.qt_api in QT_APIS:
-        os.environ['QT_API'] = 'pyqt6'
-    else:
-        os.environ['QT_API'] = args.qt_api
-
+    os.environ['QT_API'] = 'pyqt6' if args.qt_api not in QT_APIS else args.qt_api
     if sys.platform == 'darwin':
         os.environ['QT_API'] = 'pyqt6'
         LOGGER.info('running on macOS, set QT_API to pyqt6')
@@ -49,7 +45,7 @@ def main():
     translator = QTranslator()
     translator.load(
         QLocale.system().name(),
-        osp.dirname(osp.abspath(__file__)) + "/data/translate",
+        f"{osp.dirname(osp.abspath(__file__))}/data/translate",
     )
     app.installTranslator(translator)
 

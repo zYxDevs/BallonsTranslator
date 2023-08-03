@@ -223,7 +223,7 @@ class MainWindow(FramelessWindow):
         self.leftBar.imgTransChecker.setChecked(True)
         self.st_manager.formatpanel.global_format = config.global_fontformat
         self.st_manager.formatpanel.set_active_format(config.global_fontformat)
-        
+
         self.rightComicTransStackPanel.setHidden(True)
         self.st_manager.setTextEditMode(False)
 
@@ -272,8 +272,8 @@ class MainWindow(FramelessWindow):
         self.source_download.update_progress_bar.connect(self.source_download_msgbox.updateDownloadBar)
         self.source_download.finished_downloading.connect(self.on_finished_sync_source)
 
-        textblock_mode = config.imgtrans_textblock
         if config.imgtrans_textedit:
+            textblock_mode = config.imgtrans_textblock
             if textblock_mode:
                 self.bottomBar.textblockChecker.setChecked(True)
             self.bottomBar.texteditChecker.click()
@@ -329,7 +329,7 @@ class MainWindow(FramelessWindow):
         except Exception as e:
             self.opening_dir = False
             LOGGER.exception(e)
-            LOGGER.warning("Failed to load project from " + directory)
+            LOGGER.warning(f"Failed to load project from {directory}")
             LOGGER.warning("If you were trying to download images check IMPLEMENTED_SOURCES.md for more information")
             self.dl_manager.handleRunTimeException(self.tr('Failed to load project ') + directory, '')
             return
@@ -351,7 +351,7 @@ class MainWindow(FramelessWindow):
         except Exception as e:
             self.opening_dir = False
             LOGGER.exception(e)
-            LOGGER.warning("Failed to load project from " + json_path)
+            LOGGER.warning(f"Failed to load project from {json_path}")
             self.dl_manager.handleRunTimeException(self.tr('Failed to load project ') + json_path, '')
         
     def updatePageList(self):
@@ -369,8 +369,7 @@ class MainWindow(FramelessWindow):
                 self.pageList.setCurrentItem(lstitem)
 
     def pageLabelStateChanged(self):
-        setup = self.leftBar.showPageListLabel.isChecked()
-        if setup:
+        if setup := self.leftBar.showPageListLabel.isChecked():
             if self.leftStackWidget.isHidden():
                 self.leftStackWidget.show()
             if self.leftBar.globalSearchChecker.isChecked():
@@ -547,50 +546,52 @@ class MainWindow(FramelessWindow):
         self.canvas.undo()
 
     def on_page_search(self):
-        if self.canvas.gv.isVisible():
-            fo = self.app.focusObject()
-            sel_text = ''
-            tgt_edit = None
-            blkitem = self.canvas.editing_textblkitem
-            if fo == self.canvas.gv and blkitem is not None:
-                sel_text = blkitem.textCursor().selectedText()
-                tgt_edit = self.st_manager.pairwidget_list[blkitem.idx].e_trans
-            elif isinstance(fo, QTextEdit) or isinstance(fo, QPlainTextEdit):
-                sel_text = fo.textCursor().selectedText()
-                if isinstance(fo, SourceTextEdit):
-                    tgt_edit = fo
-            se = self.canvas.search_widget.search_editor
-            se.setFocus()
-            if sel_text != '':
-                se.setPlainText(sel_text)
-                cursor = se.textCursor()
-                cursor.select(QTextCursor.SelectionType.Document)
-                se.setTextCursor(cursor)
+        if not self.canvas.gv.isVisible():
+            return
+        fo = self.app.focusObject()
+        sel_text = ''
+        tgt_edit = None
+        blkitem = self.canvas.editing_textblkitem
+        if fo == self.canvas.gv and blkitem is not None:
+            sel_text = blkitem.textCursor().selectedText()
+            tgt_edit = self.st_manager.pairwidget_list[blkitem.idx].e_trans
+        elif isinstance(fo, (QTextEdit, QPlainTextEdit)):
+            sel_text = fo.textCursor().selectedText()
+            if isinstance(fo, SourceTextEdit):
+                tgt_edit = fo
+        se = self.canvas.search_widget.search_editor
+        se.setFocus()
+        if sel_text != '':
+            se.setPlainText(sel_text)
+            cursor = se.textCursor()
+            cursor.select(QTextCursor.SelectionType.Document)
+            se.setTextCursor(cursor)
 
-            if self.canvas.search_widget.isHidden():
-                self.canvas.search_widget.show()
-            self.canvas.search_widget.setCurrentEditor(tgt_edit)
+        if self.canvas.search_widget.isHidden():
+            self.canvas.search_widget.show()
+        self.canvas.search_widget.setCurrentEditor(tgt_edit)
 
     def on_global_search(self):
-        if self.canvas.gv.isVisible():
-            if not self.leftBar.globalSearchChecker.isChecked():
-                self.leftBar.globalSearchChecker.click()
-            fo = self.app.focusObject()
-            sel_text = ''
-            blkitem = self.canvas.editing_textblkitem
-            if fo == self.canvas.gv and blkitem is not None:
-                sel_text = blkitem.textCursor().selectedText()
-            elif isinstance(fo, QTextEdit) or isinstance(fo, QPlainTextEdit):
-                sel_text = fo.textCursor().selectedText()
-            se = self.global_search_widget.search_editor
-            se.setFocus()
-            if sel_text != '':
-                se.setPlainText(sel_text)
-                cursor = se.textCursor()
-                cursor.select(QTextCursor.SelectionType.Document)
-                se.setTextCursor(cursor)
-                
-                self.global_search_widget.commit_search()
+        if not self.canvas.gv.isVisible():
+            return
+        if not self.leftBar.globalSearchChecker.isChecked():
+            self.leftBar.globalSearchChecker.click()
+        fo = self.app.focusObject()
+        sel_text = ''
+        blkitem = self.canvas.editing_textblkitem
+        if fo == self.canvas.gv and blkitem is not None:
+            sel_text = blkitem.textCursor().selectedText()
+        elif isinstance(fo, (QTextEdit, QPlainTextEdit)):
+            sel_text = fo.textCursor().selectedText()
+        se = self.global_search_widget.search_editor
+        se.setFocus()
+        if sel_text != '':
+            se.setPlainText(sel_text)
+            cursor = se.textCursor()
+            cursor.select(QTextCursor.SelectionType.Document)
+            se.setTextCursor(cursor)
+
+            self.global_search_widget.commit_search()
 
     def show_MT_keyword_window(self):
         self.mtSubWidget.show()
@@ -609,11 +610,10 @@ class MainWindow(FramelessWindow):
         current_img = self.imgtrans_proj.current_img
         if current_img == page_name and not force_save:
             return
-        if current_img not in self.global_search_widget.page_set:
-            if self.canvas.projstate_unsaved: 
-                self.saveCurrentPage()
-        else:
+        if current_img in self.global_search_widget.page_set:
             self.saveCurrentPage(save_rst_only=True)
+        elif self.canvas.projstate_unsaved: 
+            self.saveCurrentPage()
         self.pageList.setCurrentRow(self.imgtrans_proj.pagename2idx(page_name))
         self.save_on_page_changed = ori_save
 
@@ -765,7 +765,7 @@ class MainWindow(FramelessWindow):
         self.configPanel.focusOnSourceDownload()
 
     def updateTranslatorStatus(self, translator: str, source: str, target: str):
-        if translator == '':
+        if not translator:
             self.bottomBar.translatorStatusbtn.hide()
             self.bottomBar.translatorStatusbtn.hide()
         else:
@@ -774,7 +774,7 @@ class MainWindow(FramelessWindow):
             self.bottomBar.transTranspageBtn.show()
 
     def updateSourceDownloadStatus(self, url: str):
-        if url == '':
+        if not url:
             self.bottomBar.sourceStatusBtn.hide()
             self.bottomBar.sourceStatusBtn.hide()
         else:
@@ -805,8 +805,7 @@ class MainWindow(FramelessWindow):
 
     def postprocess_translations(self, blk_list: List[TextBlock]) -> None:
         src_is_cjk = is_cjk(self.config.dl.translate_source)
-        tgt_is_cjk = is_cjk(self.config.dl.translate_target)
-        if tgt_is_cjk:
+        if tgt_is_cjk := is_cjk(self.config.dl.translate_target):
             for blk in blk_list:
                 if src_is_cjk:
                     blk.translation = full_len(blk.translation)
@@ -906,9 +905,7 @@ class MainWindow(FramelessWindow):
         blkitem_list = self.canvas.selected_text_items()
         if len(blkitem_list) < 1:
             return
-        pairw_list = []
-        for blk in blkitem_list:
-            pairw_list.append(self.st_manager.pairwidget_list[blk.idx])
+        pairw_list = [self.st_manager.pairwidget_list[blk.idx] for blk in blkitem_list]
         self.canvas.push_undo_command(RunBlkTransCommand(self.canvas, blkitem_list, pairw_list, mode))
 
     def on_imgtrans_progressbox_showed(self):
@@ -973,8 +970,7 @@ class MainWindow(FramelessWindow):
         self.import_doc_thread.importDoc(self.imgtrans_proj)
 
     def on_set_gsearch_widget(self):
-        setup = self.leftBar.globalSearchChecker.isChecked()
-        if setup:
+        if setup := self.leftBar.globalSearchChecker.isChecked():
             if self.leftStackWidget.isHidden():
                 self.leftStackWidget.show()
             self.leftBar.showPageListLabel.setChecked(False)
@@ -1004,8 +1000,7 @@ class MainWindow(FramelessWindow):
         self.save_config()
 
     def ocr_postprocess(self, text: str, blk: TextBlock = None) -> str:
-        text = self.ocrSubWidget.sub_text(text)
-        return text
+        return self.ocrSubWidget.sub_text(text)
 
     def translate_postprocess(self, text: str, blk: TextBlock = None) -> str:
         if self.postprocess_mt_toggle:

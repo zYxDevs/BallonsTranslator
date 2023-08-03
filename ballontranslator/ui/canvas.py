@@ -417,12 +417,8 @@ class Canvas(QGraphicsScene):
         return super().mouseMoveEvent(event)
 
     def selected_text_items(self) -> List[TextBlkItem]:
-        sel_titem = []
         selitems = self.selectedItems()
-        for sel in selitems:
-            if isinstance(sel, TextBlkItem):
-                sel_titem.append(sel)
-        return sel_titem
+        return [sel for sel in selitems if isinstance(sel, TextBlkItem)]
 
     def handle_ctrlv(self) -> bool:
         if not self.textEditMode():
@@ -458,13 +454,13 @@ class Canvas(QGraphicsScene):
             self.mid_btn_pressed = True
             self.pan_initial_pos = event.screenPos()
             return
-        
+
         if self.imgtrans_proj.img_valid:
             if self.textblock_mode and len(self.selectedItems()) == 0 and self.textEditMode():
                 if btn == Qt.MouseButton.RightButton:
                     return self.startCreateTextblock(event.scenePos())
             elif self.creating_normal_rect:
-                if btn == Qt.MouseButton.RightButton or btn == Qt.MouseButton.LeftButton:
+                if btn in [Qt.MouseButton.RightButton, Qt.MouseButton.LeftButton]:
                     return self.startCreateTextblock(event.scenePos(), hide_control=True)
 
             elif btn == Qt.MouseButton.LeftButton:
@@ -565,7 +561,10 @@ class Canvas(QGraphicsScene):
 
     @property
     def painting(self):
-        return self.image_edit_mode == ImageEditMode.PenTool or self.image_edit_mode == ImageEditMode.InpaintTool
+        return self.image_edit_mode in [
+            ImageEditMode.PenTool,
+            ImageEditMode.InpaintTool,
+        ]
 
     def setMaskTransparencyBySlider(self, slider_value: int):
         self.setMaskTransparency(slider_value / 100)
@@ -640,9 +639,8 @@ class Canvas(QGraphicsScene):
     def setProjSaveState(self, un_saved: bool):
         if un_saved == self.projstate_unsaved:
             return
-        else:
-            self.projstate_unsaved = un_saved
-            self.proj_savestate_changed.emit(un_saved)
+        self.projstate_unsaved = un_saved
+        self.proj_savestate_changed.emit(un_saved)
 
     def removeItem(self, item: QGraphicsItem) -> None:
         super().removeItem(item)

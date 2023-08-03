@@ -35,9 +35,7 @@ class MacMoveResize:
         # send click event
         cgEvent = CGEventCreateMouseEvent(
             None, kCGEventLeftMouseDown, (globalPos.x(), globalPos.y()), kCGMouseButtonLeft)
-        clickEvent = Cocoa.NSEvent.eventWithCGEvent_(cgEvent)
-
-        if clickEvent:
+        if clickEvent := Cocoa.NSEvent.eventWithCGEvent_(cgEvent):
             nsWindow.performWindowDragWithEvent_(clickEvent)
 
         # CFRelease(cgEvent)

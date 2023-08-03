@@ -23,7 +23,7 @@ class SourceDownload(QThread):
 
     def ValidateUrl(self):
         if 'https://' not in self.url:
-            self.url = 'https://' + self.url
+            self.url = f'https://{self.url}'
 
     def PassUrlToImgTransProj(self):
         self.imgtrans_proj.src_download_link = self.url

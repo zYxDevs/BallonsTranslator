@@ -5,7 +5,7 @@ import os.path as osp
 HALF2FULL = {i: i + 0xFEE0 for i in range(0x21, 0x7F)}
 HALF2FULL[0x20] = 0x3000
 
-FULL2HALF = dict((i + 0xFEE0, i) for i in range(0x21, 0x7F))
+FULL2HALF = {i + 0xFEE0: i for i in range(0x21, 0x7F)}
 FULL2HALF[0x3000] = 0x20
 FULL2HALF[0x3002] = 0x2E
 
@@ -35,7 +35,7 @@ def half_len(s):
 
 def seg_to_chars(text: str) -> List[str]:
     text = text.replace('\n', '')
-    return [c for c in text]
+    return list(text)
 
 def seg_eng(text: str) -> List[str]:
     text = text.replace('  ', ' ').replace(' .', '.').replace('\n', ' ')
@@ -46,10 +46,7 @@ def seg_eng(text: str) -> List[str]:
     for ii, c in enumerate(text):
         if c in PUNSET_RIGHT_ENG and ii < text_len - 1:
             next_c = text[ii + 1]
-            if next_c.isalpha() or next_c.isnumeric():
-                processed_text += c + ' '
-            else:
-                processed_text += c
+            processed_text += f'{c} ' if next_c.isalpha() or next_c.isnumeric() else c
         else:
             processed_text += c
 
@@ -73,20 +70,20 @@ def seg_eng(text: str) -> List[str]:
                 len_prev = len(words[-1])
             cond_next = (len_word == 2 and len_next <= 4) or len_word == 1
             cond_prev = (len_word == 2 and len_prev <= 4) or len_word == 1
-            if len_next > 0 and len_prev > 0:
-                if len_next < len_prev:
-                    append_right = cond_next
-                else:
-                    append_left = cond_prev
-            elif len_next > 0:
+            if (
+                len_next > 0
+                and len_prev > 0
+                and len_next < len_prev
+                or (len_next <= 0 or len_prev <= 0)
+                and len_next > 0
+            ):
                 append_right = cond_next
-            elif len_prev:
+            elif len_next > 0 or len_prev:
                 append_left = cond_prev
-
             if append_left:
-                words[-1] = words[-1] + ' ' + word
+                words[-1] = f'{words[-1]} {word}'
             elif append_right:
-                words.append(word + ' ' + word_list[ii + 1])
+                words.append(f'{word} {word_list[ii + 1]}')
                 skip_next = True
             else:
                 words.append(word)
@@ -98,7 +95,7 @@ def _seg_ch_pkg(text: str) -> List[str]:
 
     if text == ' ':
         return [' ']
-    elif text == '':
+    elif not text:
         return []
 
     segments = CHSEG.cut(text)
@@ -117,7 +114,7 @@ def _seg_ch_pkg(text: str) -> List[str]:
             if skip_next:
                 skip_next = False
                 continue
-            
+
             len_word, len_next, len_prev = len(word), -1, -1
             next_valid, prev_valid = False, False
             word_next, tag_next = '', ''
@@ -127,14 +124,14 @@ def _seg_ch_pkg(text: str) -> List[str]:
                 word_next, tag_next = segments[ii + 1]
                 len_next = len(word_next)
                 next_valid = True
-                if tag_next != 'w' and not word_next in PKUSEG_PUNCSET:
+                if tag_next != 'w' and word_next not in PKUSEG_PUNCSET:
                     score_next = PKUSEGSCORES[tag][tag_next]
-            
+
             if ii > 0:
                 word_prev, tag_prev = words[-1], segments[ii - 1][1]
                 len_prev = len(word_prev)
                 prev_valid = True
-                if tag_prev != 'w' and not word_prev[-1] in PKUSEG_PUNCSET:
+                if tag_prev != 'w' and word_prev[-1] not in PKUSEG_PUNCSET:
                     score_prev = PKUSEGSCORES[tag_prev][tag]
 
             append_prev, append_next = False, False
@@ -154,16 +151,15 @@ def _seg_ch_pkg(text: str) -> List[str]:
                     append_prev = prev_valid
                     append_next = next_valid
                     if append_next and append_prev:
-                        if len_prev == len_next:
-                            if score_prev >= score_next:
-                                append_next = False
-                            else:
-                                append_prev = False
-                        elif len_prev < len_next:
+                        if (
+                            len_prev == len_next
+                            and score_prev >= score_next
+                            or len_prev != len_next
+                            and len_prev < len_next
+                        ):
                             append_next = False
                         else:
                             append_prev = False
-
             if append_next and append_prev:
                 words[-1] = word_prev + word + word_next
                 tags[-1] = tags[-1] + [tag, tag_next]
@@ -206,7 +202,7 @@ def seg_ch_pkg(text: str):
     if PKUSEGSCORES is None:
         with open(PKUSEGPATH, 'r', encoding='utf8') as f:
             PKUSEGSCORES = json.loads(f.read())
-    
+
     text_list = text.replace('\n', '').replace('　', ' ').split(' ')
     result_list = []
     for ii, text in enumerate(text_list):
@@ -215,7 +211,7 @@ def seg_ch_pkg(text: str):
             words = _seg_ch_pkg(text)
         if words is not None:
             if ii > 0:
-                words[0] = ' ' + words[0]
+                words[0] = f' {words[0]}'
             result_list.extend(words)
 
     if cvt_back:

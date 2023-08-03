@@ -84,13 +84,10 @@ class KeywordSubWidget(Widget):
             self.sublist.pop(idx)
             self.submodel.removeRow(idx)
         self.changing_rows = False
-        pass
 
     def on_del_selected(self):
         sel_ids = self.subtable.selectedIndexes()
-        delist = set()
-        for idx in sel_ids:
-            delist.add(self.submodel.itemFromIndex(idx).row())
+        delist = {self.submodel.itemFromIndex(idx).row() for idx in sel_ids}
         delist = list(delist)
         self.delete_subpairs(delist)
 

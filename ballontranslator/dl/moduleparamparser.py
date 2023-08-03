@@ -29,9 +29,7 @@ class ModuleParamParser:
         return False
 
     def is_computational_intensive(self) -> bool:
-        if self.setup_params is not None and 'device' in self.setup_params:
-            return True
-        return False
+        return self.setup_params is not None and 'device' in self.setup_params
 
 
 import torch

@@ -28,8 +28,8 @@ def get_topk_color(color_list, bins, k=3, color_var=10, bin_tol=0.001):
 
 def minxor_thresh(threshed, mask, dilate=False):
     neg_threshed = 255 - threshed
-    e_size = 1
     if dilate:
+        e_size = 1
         element = cv2.getStructuringElement(cv2.MORPH_RECT, (2 * e_size + 1, 2 * e_size + 1),(e_size, e_size))
         neg_threshed = cv2.dilate(neg_threshed, element, iterations=1)
         threshed = cv2.dilate(threshed, element, iterations=1)
@@ -48,10 +48,7 @@ def get_otsuthresh_masklist(img, pred_mask, per_channel=False) -> List[np.ndarra
         threshed, xor_sum = minxor_thresh(threshed, pred_mask, dilate=False)
         mask_list.append([threshed, xor_sum])
     mask_list.sort(key=lambda x: x[1])
-    if per_channel:
-        return mask_list
-    else:
-        return [mask_list[0]]
+    return mask_list if per_channel else [mask_list[0]]
 
 def get_topk_masklist(im_grey, pred_mask):
     if len(im_grey.shape) == 3 and im_grey.shape[-1] == 3:
@@ -61,8 +58,8 @@ def get_topk_masklist(im_grey, pred_mask):
     bin, his = np.histogram(candidate_grey_px, bins=255)
     topk_color = get_topk_color(his, bin, color_var=10, k=3)
     color_range = 30
-    mask_list = list()
-    for ii, color in enumerate(topk_color):
+    mask_list = []
+    for color in topk_color:
         c_top = min(color+color_range, 255)
         c_bottom = c_top - 2 * color_range
         threshed = cv2.inRange(im_grey, c_bottom, c_top)
@@ -81,7 +78,7 @@ def merge_mask_list(mask_list, pred_mask, blk: TextBlock = None, pred_thresh=30,
             line[..., 1] -= text_window[1]
             cv2.fillPoly(linemask, [line], 255)
         linemask = cv2.dilate(linemask, np.ones((3, 3), np.uint8), iterations=3)
-    
+
     if pred_thresh > 0:
         e_size = 1
         element = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * e_size + 1, 2 * e_size + 1),(e_size, e_size))      
@@ -89,7 +86,7 @@ def merge_mask_list(mask_list, pred_mask, blk: TextBlock = None, pred_thresh=30,
         _, pred_mask = cv2.threshold(pred_mask, 60, 255, cv2.THRESH_BINARY)
     connectivity = 8
     mask_merged = np.zeros_like(pred_mask)
-    for ii, (candidate_mask, xor_sum) in enumerate(mask_list):
+    for candidate_mask, xor_sum in mask_list:
         num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(candidate_mask, connectivity, cv2.CV_16U)
         for label_index, stat, centroid in zip(range(num_labels), stats, centroids):
             if label_index != 0: # skip background label
@@ -112,10 +109,7 @@ def merge_mask_list(mask_list, pred_mask, blk: TextBlock = None, pred_thresh=30,
     # fill holes
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(255-mask_merged, connectivity, cv2.CV_16U)
     sorted_area = np.sort(stats[:, -1])
-    if len(sorted_area) > 1:
-        area_thresh = sorted_area[-2]
-    else:
-        area_thresh = sorted_area[-1]
+    area_thresh = sorted_area[-2] if len(sorted_area) > 1 else sorted_area[-1]
     for label_index, stat, centroid in zip(range(num_labels), stats, centroids):
         x, y, w, h, area = stat
         if area < area_thresh:
@@ -151,7 +145,7 @@ def refine_undetected_mask(img: np.ndarray, mask_pred: np.ndarray, mask_refined:
                     bbox_score = bbox_s
             if bbox_score / w / h < 0.5:
                 seg_blk_list.append(TextBlock(bbox))
-    if len(seg_blk_list) > 0:
+    if seg_blk_list:
         mask_refined = cv2.bitwise_or(mask_refined, refine_mask(img, mask_pred, seg_blk_list, refine_mode=refine_mode))
     return mask_refined
 

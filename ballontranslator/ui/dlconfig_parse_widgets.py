@@ -78,14 +78,14 @@ class ParamWidget(QWidget):
         super().__init__(*args, **kwargs)
         param_layout = QVBoxLayout(self)
         param_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        
+
         param_layout.setContentsMargins(0, 0, 0, 0)
         param_layout.setSpacing(14)
         for param_key in params:
             param_label = ParamNameLabel(param_key)
             if param_key == 'description':
                 continue
-            
+
             elif isinstance(params[param_key], str):
                 param_widget = ParamEditor(param_key)
                 param_widget.setText(params[param_key])
@@ -93,10 +93,7 @@ class ParamWidget(QWidget):
             elif isinstance(params[param_key], dict):
                 param_dict = params[param_key]
                 if param_dict['type'] == 'selector':
-                    if 'url' in param_key:
-                        size = CONFIG_COMBOBOX_MIDEAN
-                    else:
-                        size = CONFIG_COMBOBOX_SHORT
+                    size = CONFIG_COMBOBOX_MIDEAN if 'url' in param_key else CONFIG_COMBOBOX_SHORT
                     param_widget = ParamComboBox(param_key, param_dict['options'], size=size)
 
                     # if cuda is not available, disable combobox 'cuda' item

@@ -69,15 +69,15 @@ class PresetListWidget(QListWidget):
     def handle_duplicate_name(self, name: str, preset_num=0) -> str:
         dd_name = name
         while True:
-            if not dd_name in self.presets:
+            if dd_name not in self.presets:
                 break
             preset_num += 1
-            dd_name = name + '_' + str(preset_num).zfill(3)
+            dd_name = f'{name}_{str(preset_num).zfill(3)}'
         return dd_name
 
     def add_new_preset(self, preset_name: str = None):
         if preset_name is None:
-            preset_name = self.default_preset_name + '_' + str(self.count() + 1).zfill(3)
+            preset_name = f'{self.default_preset_name}_{str(self.count() + 1).zfill(3)}'
             preset_name = self.handle_duplicate_name(preset_name)
         item = QListWidgetItem(preset_name)
         item.setFlags(item.flags() | Qt.ItemFlag.ItemIsEditable)

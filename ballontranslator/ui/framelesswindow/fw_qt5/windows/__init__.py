@@ -114,8 +114,6 @@ class WindowsFramelessWindow(QWidget):
                     rect.top += Taskbar.AUTO_HIDE_THICKNESS
                 elif position == Taskbar.BOTTOM:
                     rect.bottom -= Taskbar.AUTO_HIDE_THICKNESS
-                elif position == Taskbar.LEFT:
-                    rect.left += Taskbar.AUTO_HIDE_THICKNESS
                 elif position == Taskbar.RIGHT:
                     rect.right -= Taskbar.AUTO_HIDE_THICKNESS
 

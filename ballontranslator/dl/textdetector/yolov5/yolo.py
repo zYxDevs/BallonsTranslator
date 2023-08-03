@@ -126,10 +126,7 @@ class Model(nn.Module):
                 if m.i in self.out_indices:
                     z.append(x)
         if self.out_indices is not None:
-            if detect:
-                return x, z
-            else:
-                return z
+            return (x, z) if detect else z
         else:
             return x
 
@@ -288,15 +285,11 @@ def load_yolov5_ckpt(weights, map_location='cpu', fuse=True, inplace=True, out_i
         ckpt = torch.load(weights, map_location=map_location)  # load
     else:
         ckpt = weights
-    
+
     model = Model(ckpt['cfg'])
     model.load_state_dict(ckpt['weights'], strict=True)
-    
-    if fuse:
-        model = model.float().fuse().eval()  # FP32 model
-    else:
-        model = model.float().eval()  # without layer fuse
 
+    model = model.float().fuse().eval() if fuse else model.float().eval()
     # Compatibility updates
     for m in model.modules():
         if type(m) in [nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Model]:

@@ -107,7 +107,7 @@ class ControlBlockItem(QGraphicsRectItem):
         if blk_item is None:
             return
 
-        if self.drag_mode == self.DRAG_RESHAPE:    
+        if self.drag_mode == self.DRAG_RESHAPE:
             block_group = self.ctrl.ctrlblock_group
             crect = self.ctrl.rect()
             pos_x, pos_y = 0, 0
@@ -134,20 +134,19 @@ class ControlBlockItem(QGraphicsRectItem):
                     pos_y = max(self.pos().y(), oppo_pos.y())
                     crect.setX(pos_x+self.visible_len)
                     crect.setHeight(pos_y-oppo_pos.y())
-            else:
-                if self.idx == 1:
-                    pos_y = min(self.pos().y(), oppo_pos.y())
-                    crect.setY(pos_y+self.visible_len)
-                elif self.idx == 3:
-                    pos_x = max(self.pos().x(), oppo_pos.x())
-                    crect.setWidth(pos_x-oppo_pos.x())
-                elif self.idx == 5:
-                    pos_y = max(self.pos().y(), oppo_pos.y())
-                    crect.setHeight(pos_y-oppo_pos.y())
-                else:   # idx == 7
-                    pos_x = min(self.pos().x(), oppo_pos.x())
-                    crect.setX(pos_x+self.visible_len)
-            
+            elif self.idx == 1:
+                pos_y = min(self.pos().y(), oppo_pos.y())
+                crect.setY(pos_y+self.visible_len)
+            elif self.idx == 3:
+                pos_x = max(self.pos().x(), oppo_pos.x())
+                crect.setWidth(pos_x-oppo_pos.x())
+            elif self.idx == 5:
+                pos_y = max(self.pos().y(), oppo_pos.y())
+                crect.setHeight(pos_y-oppo_pos.y())
+            else:   # idx == 7
+                pos_x = min(self.pos().x(), oppo_pos.x())
+                crect.setX(pos_x+self.visible_len)
+
             self.ctrl.setRect(crect)
             scale = self.ctrl.current_scale
             new_center = self.ctrl.sceneBoundingRect().center()
@@ -168,8 +167,7 @@ class ControlBlockItem(QGraphicsRectItem):
             self.updateAngleLabelPos()
 
     def get_angle_idx(self, angle) -> int:
-        idx = int((angle + 22.5) % 360 / 45)
-        return idx
+        return int((angle + 22.5) % 360 / 45)
     
     def mouseReleaseEvent(self, event: QGraphicsSceneMouseEvent) -> None:
         if event.button() == Qt.MouseButton.LeftButton:

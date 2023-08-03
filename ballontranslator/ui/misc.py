@@ -33,12 +33,11 @@ def pixmap2ndarray(pixmap: Union[QPixmap, QImage], keep_alpha=True):
 
     byte_str = qimg.bits().asstring(h * w * 4)
     img = np.fromstring(byte_str, dtype=np.uint8).reshape((w,h,4))
-    
-    if keep_alpha:
-        img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGRA)
-        return img
-    else:
+
+    if not keep_alpha:
         return np.copy(img[:,:,:3])
+    img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGRA)
+    return img
 
 def ndarray2pixmap(img, return_qimg=False):
     if len(img.shape) == 2:
@@ -51,9 +50,7 @@ def ndarray2pixmap(img, return_qimg=False):
         img_format = QImage.Format.Format_RGB888
     img = np.ascontiguousarray(img)
     qImg = QImage(img.data, width, height, bytesPerLine, img_format).rgbSwapped()
-    if return_qimg:
-        return qImg
-    return QPixmap(qImg)
+    return qImg if return_qimg else QPixmap(qImg)
 
 class TextBlkEncoder(NumpyEncoder):
     def default(self, obj):
@@ -174,23 +171,20 @@ class DLModuleConfig:
         self.enable_translate = enable_translate
         self.enable_inpaint = enable_inpaint
         if textdetector_setup_params is None:
-            self.textdetector_setup_params = dict()
+            self.textdetector_setup_params = {}
         else:
             self.textdetector_setup_params = textdetector_setup_params
-        if ocr_setup_params is None:
-            self.ocr_setup_params = dict()
-        else:
-            self.ocr_setup_params = ocr_setup_params
+        self.ocr_setup_params = {} if ocr_setup_params is None else ocr_setup_params
         if translator_setup_params is None:
-            self.translator_setup_params = dict()
+            self.translator_setup_params = {}
         else:
             self.translator_setup_params = translator_setup_params
             if 'google' in translator_setup_params:
                 if 'url' in translator_setup_params['google'] and \
-                    translator_setup_params['google']['url']['select'] == 'https://translate.google.cn/m':
+                        translator_setup_params['google']['url']['select'] == 'https://translate.google.cn/m':
                     translator_setup_params['google']['url']['select'] = 'https://translate.google.com/m'
         if inpainter_setup_params is None:
-            self.inpainter_setup_params = dict()
+            self.inpainter_setup_params = {}
         else:
             self.inpainter_setup_params = inpainter_setup_params
         self.translate_source = translate_source
@@ -352,12 +346,10 @@ fontsize_pattern = re.compile(r'font-size:(.*?)pt;', re.DOTALL)
 
 
 def span_repl_func(matched, color):
-    style = "<p style=\"" + matched.group(1) + " color:" + color + ";\">"
-    return style
+    return "<p style=\"" + matched.group(1) + " color:" + color + ";\">"
 
 def p_repl_func(matched, color):
-    style = "<p style=\"" + matched.group(1) + " color:" + color + ";\">"
-    return style
+    return "<p style=\"" + matched.group(1) + " color:" + color + ";\">"
 
 def set_html_color(html, rgb):
     hex_color = '#%02x%02x%02x' % (rgb[0], rgb[1], rgb[2])
@@ -377,10 +369,7 @@ def px2pt(px):
 def html_max_fontsize(html:  str) -> float:
     size_list = fontsize_pattern.findall(html)
     size_list = [float(size) for size in size_list]
-    if len(size_list) > 0:
-        return max(size_list)
-    else:
-        return None
+    return max(size_list, default=None)
 
 def doc_replace(doc: QTextDocument, span_list: List, target: str) -> List:
     len_replace = len(target)
@@ -415,7 +404,7 @@ def hex2rgb(h: str):  # rgb order (PIL)
 
 def parse_stylesheet(theme: str = '', reverse_icon: bool = False) -> str:
     if reverse_icon:
-        dark2light = True if theme == 'eva-light' else False
+        dark2light = theme == 'eva-light'
         reverse_icon_color(dark2light)
     with open(STYLESHEET_PATH, "r", encoding='utf-8') as f:
         stylesheet = f.read()
@@ -455,10 +444,10 @@ def reverse_icon_color(dark2light: bool = False):
                 ICON_LIST.append(osp.join(ICON_DIR, filename))
 
     if dark2light:
-        pattern = re.compile(re.escape(DARKFILL) + '|' + re.escape(DARKFILL_ACTIVE))
+        pattern = re.compile(f'{re.escape(DARKFILL)}|{re.escape(DARKFILL_ACTIVE)}')
         rep_dict = ICONREVERSE_DICT_DARK2LIGHT
     else:
-        pattern = re.compile(re.escape(LIGHTFILL) + '|' + re.escape(LIGHTFILL_ACTIVE))
+        pattern = re.compile(f'{re.escape(LIGHTFILL)}|{re.escape(LIGHTFILL_ACTIVE)}')
         rep_dict = ICONREVERSE_DICT_LIGHT2DARK
     for svgpath in ICON_LIST:
         with open(svgpath, "r", encoding="utf-8") as f:

@@ -46,16 +46,13 @@ class ModuleThread(QThread):
         old_module = self.module
         try:
             module: Union[TextDetectorBase, TranslatorBase, InpainterBase, OCRBase] \
-                = self.module_register.module_dict[module_name]
+                    = self.module_register.module_dict[module_name]
             setup_params = self.dl_config.get_setup_params(self.module_key)[module_name]
-            if setup_params is not None:
-                self.module = module(**setup_params)
-            else:
-                self.module = module()
+            self.module = module(**setup_params) if setup_params is not None else module()
         except Exception as e:
             self.module = old_module
             msg = self.tr('Failed to set ') + module_name
-            
+
             self.exception_occurred.emit(msg, str(e), traceback.format_exc())
         self.finish_set_module.emit()
 
@@ -182,7 +179,7 @@ class TranslateThread(ModuleThread):
         self.finish_set_module.emit()
 
     def setTranslator(self, translator: str):
-        if translator in ['Sugoi']:
+        if translator in {'Sugoi'}:
             self._set_translator(translator)
         else:
             self.job = lambda : self._set_translator(translator)
@@ -225,7 +222,7 @@ class TranslateThread(ModuleThread):
             if len(self.pipeline_pagekey_queue) == 0:
                 time.sleep(0.1)
                 continue
-            
+
             page_key = self.pipeline_pagekey_queue.pop(0)
             self.blockSignals(True)
             try:
@@ -236,8 +233,8 @@ class TranslateThread(ModuleThread):
 
                 msg = self.tr('Translation Failed.')
                 if isinstance(e, MissingTranslatorParams):
-                    msg = msg + '\n' + str(e) + self.tr(' is required for ' + self.translator.name)
-                    
+                    msg = msg + '\n' + str(e) + self.tr(f' is required for {self.translator.name}')
+
                 self.blockSignals(False)
                 self.exception_occurred.emit(msg, repr(e), traceback.format_exc())
                 self.imgtrans_proj = None
@@ -314,7 +311,7 @@ class ImgtransThread(QThread):
             self.finish_blktrans_stage.emit('translate', 100)
         if mode > 1:
             im_h, im_w = tgt_img.shape[:2]
-            progress_prod = 100. / len(blk_list) if len(blk_list) > 0 else 0
+            progress_prod = 100. / len(blk_list) if blk_list else 0
             for ii, blk in enumerate(blk_list):
                 xyxy = enlarge_window(blk.xyxy, im_w, im_h)
                 xyxy = np.array(xyxy)
@@ -420,13 +417,11 @@ class ImgtransThread(QThread):
                     counter = min(counter, self.translate_thread.finished_counter)
                 else:
                     counter = min(counter, self.translate_counter)
-                    
+
         if self.dl_config.enable_inpaint:
             counter = min(counter, self.inpaint_counter)
-        
-        if ref_counter is not None:
-            return min(counter, ref_counter) - 1
-        return counter - 1
+
+        return counter - 1 if ref_counter is None else min(counter, ref_counter) - 1
 
 def merge_config_module_params(config_params: Dict, module_keys: List, get_module: Callable) -> Dict:
     for module_key in module_keys:
@@ -716,21 +711,21 @@ class DLManager(QObject):
     def on_finish_setdetector(self):
         if self.textdetector is not None:
             self.dl_config.textdetector = self.textdetector.name
-            LOGGER.info('Text detector set to {}'.format(self.textdetector.name))
+            LOGGER.info(f'Text detector set to {self.textdetector.name}')
 
     def on_finish_setocr(self):
         if self.ocr is not None:
             self.dl_config.ocr = self.ocr.name
             self.ocr_panel.setOCR(self.ocr.name)
             self.ocr_thread.module.register_postprocess_hooks(self.ocr_postprocess)
-            LOGGER.info('OCR set to {}'.format(self.ocr.name))
+            LOGGER.info(f'OCR set to {self.ocr.name}')
 
     def on_finish_setinpainter(self):
         if self.inpainter is not None:
             self.dl_config.inpainter = self.inpainter.name
             self.inpaint_panel.setInpainter(self.inpainter.name)
             self.update_inpainter_status.emit(self.dl_config.inpainter)
-            LOGGER.info('Inpainter set to {}'.format(self.inpainter.name))
+            LOGGER.info(f'Inpainter set to {self.inpainter.name}')
 
     def on_finish_settranslator(self):
         translator = self.translator
@@ -739,7 +734,7 @@ class DLManager(QObject):
             self.update_translator_status.emit(self.dl_config.translator, self.dl_config.translate_source, self.dl_config.translate_target)
             self.translator_panel.finishSetTranslator(translator)
             self.translate_thread.module.register_postprocess_hooks(self.translate_postprocess)
-            LOGGER.info('Translator set to {}'.format(self.translator.name))
+            LOGGER.info(f'Translator set to {self.translator.name}')
         else:
             LOGGER.error('invalid translator')
             self.update_translator_status.emit(self.tr('Invalid'), '', '')
@@ -821,7 +816,7 @@ class DLManager(QObject):
         
     def handleRunTimeException(self, msg: str, detail: str = None, verbose: str = ''):
         if detail is not None:
-            msg += ': ' + detail
+            msg += f': {detail}'
         LOGGER.error(msg + '\n' + verbose)
         err = QMessageBox()
         err.setText(msg)

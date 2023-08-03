@@ -63,12 +63,9 @@ class ResNet(nn.Module):
                           kernel_size=1, stride=stride, bias=False),
             )
 
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
+        layers = [block(self.inplanes, planes, stride, downsample)]
         self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
+        layers.extend(block(self.inplanes, planes) for _ in range(1, blocks))
         return nn.Sequential(*layers)
 
     def forward(self, x):
@@ -178,7 +175,11 @@ class PositionalEncoding(nn.Module):
 
 def generate_square_subsequent_mask(sz):
     mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
-    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    mask = (
+        mask.float()
+        .masked_fill(mask == 0, float('-inf'))
+        .masked_fill(mask == 1, 0.0)
+    )
     return mask
 
 class AddCoords(nn.Module):
@@ -388,7 +389,7 @@ class OCR(nn.Module) :
             self.bg_g_pred(color_feats), \
             self.bg_b_pred(color_feats)
 
-    def infer_beam_batch(self, img: torch.FloatTensor, img_widths: List[int], beams_k: int = 5, start_tok = 1, end_tok = 2, pad_tok = 0, max_finished_hypos: int = 2, max_seq_length = 384) :
+    def infer_beam_batch(self, img: torch.FloatTensor, img_widths: List[int], beams_k: int = 5, start_tok = 1, end_tok = 2, pad_tok = 0, max_finished_hypos: int = 2, max_seq_length = 384):
         N, C, H, W = img.shape
         assert H == 32 and C == 3
         feats = self.backbone(img)
@@ -408,11 +409,13 @@ class OCR(nn.Module) :
         pred_chars_values, pred_chars_index = torch.topk(pred_char_logprob, beams_k, dim = 1)
         new_hypos = []
         finished_hypos = defaultdict(list)
-        for i in range(N) :
-            for k in range(beams_k) :
-                new_hypos.append(hypos[i].extend(pred_chars_index[i, k], pred_chars_values[i, k]))
+        for i in range(N):
+            new_hypos.extend(
+                hypos[i].extend(pred_chars_index[i, k], pred_chars_values[i, k])
+                for k in range(beams_k)
+            )
         hypos = new_hypos
-        for _ in range(max_seq_length) :
+        for _ in range(max_seq_length):
             # N * k, E
             decoded = next_token_batch(hypos, memory, torch.stack([input_mask[hyp.memory_idx] for hyp in hypos]) , self.decoders, self.pe, self.embd)
             # N * k, n_chars
@@ -426,24 +429,22 @@ class OCR(nn.Module) :
                     hypos_per_sample[h.memory_idx].append(h.extend(pred_chars_index[i, k], pred_chars_values[i, k]))
             hypos = []
             # hypos_per_sample now contains N * k^2 hypos
-            for i in hypos_per_sample.keys() :
-                cur_hypos: List[Hypothesis] = hypos_per_sample[i]
+            for i, cur_hypos in hypos_per_sample.items():
                 cur_hypos = sorted(cur_hypos, key = lambda a: a.sort_key())[: beams_k + 1]
                 #print(cur_hypos[0].out_idx[-1])
                 to_added_hypos = []
                 sample_done = False
-                for h in cur_hypos :
-                    if h.seq_end() :
+                for h in cur_hypos:
+                    if h.seq_end():
                         finished_hypos[i].append(h)
                         if len(finished_hypos[i]) >= max_finished_hypos :
                             sample_done = True
                             break
-                    else :
-                        if len(to_added_hypos) < beams_k :
-                            to_added_hypos.append(h)
+                    elif len(to_added_hypos) < beams_k:
+                        to_added_hypos.append(h)
                 if not sample_done :
                     hypos.extend(to_added_hypos)
-            if len(hypos) == 0 :
+            if not hypos:
                 break
         # add remaining hypos to finished
         for i in range(N) :
@@ -459,22 +460,22 @@ class OCR(nn.Module) :
             decoded = cur_hypo.output()
             color_feats = self.color_pred1(decoded)
             fg_r, fg_g, fg_b, bg_r, bg_g, bg_b = self.fg_r_pred(color_feats), \
-                self.fg_g_pred(color_feats), \
-                self.fg_b_pred(color_feats), \
-                self.bg_r_pred(color_feats), \
-                self.bg_g_pred(color_feats), \
-                self.bg_b_pred(color_feats)
+                    self.fg_g_pred(color_feats), \
+                    self.fg_b_pred(color_feats), \
+                    self.bg_r_pred(color_feats), \
+                    self.bg_g_pred(color_feats), \
+                    self.bg_b_pred(color_feats)
             result.append((cur_hypo.out_idx, cur_hypo.prob(), fg_r, fg_g, fg_b, bg_r, bg_g, bg_b))
         return result
 
-    def infer_beam(self, img: torch.FloatTensor, beams_k: int = 5, start_tok = 1, end_tok = 2, pad_tok = 0, max_seq_length = 384) :
+    def infer_beam(self, img: torch.FloatTensor, beams_k: int = 5, start_tok = 1, end_tok = 2, pad_tok = 0, max_seq_length = 384):
         N, C, H, W = img.shape
         assert H == 32 and N == 1 and C == 3
         feats = self.backbone(img)
         feats = torch.einsum('n e h s -> s n e', feats)
         feats = self.pe(feats)
         memory = self.encoders(feats)
-        def run(tokens, add_start_tok = True, char_only = True) :
+        def run(tokens, add_start_tok = True, char_only = True):
             if add_start_tok :
                 if isinstance(tokens, list) :
                     # N(=1), L
@@ -490,17 +491,17 @@ class OCR(nn.Module) :
             decoded = self.decoders(embd, memory, tgt_mask = casual_mask)
             decoded = decoded.permute(1, 0, 2)
             pred_char_logprob = self.pred(self.pred1(decoded)).log_softmax(-1)
-            if char_only :
+            if char_only:
                 return pred_char_logprob
-            else :
-                color_feats = self.color_pred1(decoded)
-                return pred_char_logprob, \
+            color_feats = self.color_pred1(decoded)
+            return pred_char_logprob, \
                     self.fg_r_pred(color_feats), \
                     self.fg_g_pred(color_feats), \
                     self.fg_b_pred(color_feats), \
                     self.bg_r_pred(color_feats), \
                     self.bg_g_pred(color_feats), \
                     self.bg_b_pred(color_feats)
+
         # N, L, embd_size
         initial_char_logprob = run([])
         # N, L
@@ -633,7 +634,7 @@ class OCR32pxModel:
         if self.device != 'cpu':
             images = images.to(self.device)
         ret = self.net.infer_beam_batch(img, widths, beams_k = 5, max_seq_length = 255)
-        for i, (pred_chars_index, prob, fr, fg, fb, br, bg, bb) in enumerate(ret) :
+        for i, (pred_chars_index, prob, fr, fg, fb, br, bg, bb) in enumerate(ret):
             if prob < 0.5 :
                 continue
             seq = []
@@ -646,6 +647,5 @@ class OCR32pxModel:
                 if ch == '<SP>' :
                     ch = ' '
                 seq.append(ch)
-            txt = ''.join(seq)
-            return txt
+            return ''.join(seq)
         

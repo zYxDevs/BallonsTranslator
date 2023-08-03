@@ -5,7 +5,7 @@ from pathlib import Path
 def set_svgcolor(svgpath, savename, color):
     fillcolor = "fill=\"" + color + "\""
     if savename is not None:
-        savepath = osp.join(osp.dirname(svgpath), savename + ".svg")
+        savepath = osp.join(osp.dirname(svgpath), f"{savename}.svg")
     else:
         savepath = svgpath
     subs = None
@@ -14,7 +14,11 @@ def set_svgcolor(svgpath, savename, color):
         if re.findall(r'fill=\"(.*?)\"', fread):
             subs = re.sub(r'fill=\"(.*?)\"', lambda matchedobj: fillcolor, fread)
         else:
-            subs = re.sub(r'p-id=\"(.*?)\"', lambda matchedobj: matchedobj.group(0) + ' ' + fillcolor, fread)
+            subs = re.sub(
+                r'p-id=\"(.*?)\"',
+                lambda matchedobj: f'{matchedobj.group(0)} {fillcolor}',
+                fread,
+            )
     with open(savepath, "w", encoding="utf-8") as f:
         f.write(subs)
 
@@ -30,7 +34,7 @@ def minify_svg(svgpath):
     with open(svgpath, "r", encoding="utf-8") as f:
         fread = f.read()
         p = re.findall(r'<path d=(.*?)</path>', fread)[0]
-        p = r'<path d=' + p + r'</path>'
+        p = f'<path d={p}</path>'
         v = re.findall(r'viewBox=\"(.*?)\"', fread)[0]
         svg = svgtemplate.replace("PATH", p)
         svg = svg.replace("VIEWBOX", v)

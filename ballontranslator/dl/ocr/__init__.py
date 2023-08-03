@@ -16,11 +16,14 @@ class OCRBase(ModuleParamParser):
 
     def __init__(self, **setup_params) -> None:
         super().__init__(**setup_params)
-        self.name = ''
-        for key in OCR.module_dict:
-            if OCR.module_dict[key] == self.__class__:
-                self.name = key
-                break
+        self.name = next(
+            (
+                key
+                for key in OCR.module_dict
+                if OCR.module_dict[key] == self.__class__
+            ),
+            '',
+        )
         self.postprocess_hooks: OrderedSet[Callable] = OrderedSet()
         self.setup_ocr()
 
@@ -67,8 +70,7 @@ OCR32PXMODEL: OCR32pxModel = None
 OCR32PXMODEL_PATH = r'data/models/mit32px_ocr.ckpt'
 
 def load_32px_model(model_path, device, chunk_size=16) -> OCR32pxModel:
-    model = OCR32pxModel(model_path, device, max_chunk_size=chunk_size)
-    return model
+    return OCR32pxModel(model_path, device, max_chunk_size=chunk_size)
 
 @register_OCR('mit32px')
 class OCRMIT32px(OCRBase):
@@ -187,8 +189,7 @@ OCR48PXMODEL: OCR48pxCTC = None
 OCR48PXMODEL_PATH = r'data/models/mit48pxctc_ocr.ckpt'
 
 def load_48px_model(model_path, device, chunk_size=16) -> OCR48pxCTC:
-    model = OCR48pxCTC(model_path, device, max_chunk_size=chunk_size)
-    return model
+    return OCR48pxCTC(model_path, device, max_chunk_size=chunk_size)
 
 @register_OCR('mit48px_ctc')
 class OCRMIT48pxCTC(OCRBase):

@@ -48,7 +48,7 @@ class HTMLDelegate( QStyledItemDelegate ):
 
 
 def get_rstitem_renderhtml(text: str, span: Tuple[int, int], font: QFont = None) -> str:
-    if text == '':
+    if not text:
         return text
     doc = QTextDocument()
     if font is None:
@@ -64,11 +64,10 @@ def get_rstitem_renderhtml(text: str, span: Tuple[int, int], font: QFont = None)
     cursor.setCharFormat(cfmt)
     html = doc.toHtml()
     cleaned_html = re.findall(r'<body(.*?)>(.*?)</body>', html, re.DOTALL)
-    if len(cleaned_html) > 0:
-        cleaned_html = cleaned_html[0]
-        return f'<body{cleaned_html[0]}>{cleaned_html[1]}</body>'
-    else:
+    if len(cleaned_html) <= 0:
         return ''
+    cleaned_html = cleaned_html[0]
+    return f'<body{cleaned_html[0]}>{cleaned_html[1]}</body>'
 
 class SearchResultItem(QStandardItem):
     def __init__(self, text: str, span: Tuple[int, int], blk_idx: int, pagename: str, is_src: bool):
@@ -89,7 +88,7 @@ class PageSeachResultItem(QStandardItem):
         super().__init__()
         self.setData(result_counter, Qt.ItemDataRole.UserRole)
         self.pagename = pagename
-        self.setText(str(result_counter) + ' - ' + pagename)
+        self.setText(f'{result_counter} - {pagename}')
         self.blkid2match = blkid2match
         font = self.font()
         font.setPointSizeF(SEARCHRST_FONTSIZE)
@@ -98,10 +97,10 @@ class PageSeachResultItem(QStandardItem):
 
 
 def gen_searchitem_list(span_list: List[int], text: str, blk_idx: int, pagename: str, is_src: bool) -> List[SearchResultItem]:
-    sr_list = []
-    for span in span_list:
-        sr_list.append(SearchResultItem(text, span, blk_idx, pagename, is_src))
-    return sr_list
+    return [
+        SearchResultItem(text, span, blk_idx, pagename, is_src)
+        for span in span_list
+    ]
 
 def match_blk(pattern: re.Pattern, blk: TextBlock, match_src: bool) -> Tuple[List[Tuple], int]:
     if match_src:
@@ -121,13 +120,12 @@ class SearchResultModel(QStandardItemModel):
     def data(self, index, role):
         if not index.isValid():
             return None
-        if role == Qt.ItemDataRole.SizeHintRole:
-            size = QSize()
-            item = self.itemFromIndex(index)
-            size.setHeight(item.font().pointSize()+14)
-            return size
-        else:
+        if role != Qt.ItemDataRole.SizeHintRole:
             return super().data(index, role)
+        size = QSize()
+        item = self.itemFromIndex(index)
+        size.setHeight(item.font().pointSize()+14)
+        return size
 
 
 class SearchResultTree(QTreeView):
@@ -438,9 +436,9 @@ class GlobalSearchWidget(Widget):
         self.req_update_pagetext.emit()
         self.counter_sum = 0
 
-        match_src = True if self.range_combobox.currentIndex() != 0 else False
-        match_trans = True if self.range_combobox.currentIndex() != 1 else False
-        
+        match_src = self.range_combobox.currentIndex() != 0
+        match_trans = self.range_combobox.currentIndex() != 1
+
         for pagename, page in self.imgtrans_proj.pages.items():
             page_match_counter = 0
             page_rstitem_list = []
@@ -540,10 +538,9 @@ class GlobalSearchWidget(Widget):
             return
         if pagename not in self.page_set:
             return
+        self.page_set.remove(pagename)
+        self.fin_page_counter += 1
+        if self.fin_page_counter == self.num_pages:
+            self.progress_bar.hide()
         else:
-            self.page_set.remove(pagename)
-            self.fin_page_counter += 1
-            if self.fin_page_counter == self.num_pages:
-                self.progress_bar.hide()
-            else:
-                self.progress_bar.updateTaskProgress(int(self.fin_page_counter / self.num_pages * 100))
+            self.progress_bar.updateTaskProgress(int(self.fin_page_counter / self.num_pages * 100))

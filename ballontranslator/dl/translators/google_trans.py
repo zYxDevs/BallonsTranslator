@@ -71,7 +71,7 @@ class BaseTranslator(ABC):
         @param max_chars: maximum characters allowed
         @return: bool
         """
-        return True if min_chars <= len(payload) < max_chars else False
+        return min_chars <= len(payload) < max_chars
 
     @abstractmethod
     def translate(self, text, **kwargs):
@@ -104,9 +104,9 @@ class GoogleTranslator(BaseTranslator):
         #######################################
         source_lower = source
         target_lower = target
-        if not source in self._languages.values():
+        if source not in self._languages.values():
             source_lower=source.lower()
-        if not target in self._languages.values():
+        if target not in self._languages.values():
             target_lower=target.lower()
         #######################################
 
@@ -139,10 +139,14 @@ class GoogleTranslator(BaseTranslator):
         @param lang: language name
         @return: primary name of a language if found otherwise False
         """
-        for primary_name, secondary_names in GOOGLE_LANGUAGES_SECONDARY_NAMES.items():
-            if lang in secondary_names:
-                return primary_name
-        return False
+        return next(
+            (
+                primary_name
+                for primary_name, secondary_names in GOOGLE_LANGUAGES_SECONDARY_NAMES.items()
+                if lang in secondary_names
+            ),
+            False,
+        )
 
     def _map_language_to_code(self, *languages):
         """
@@ -178,40 +182,39 @@ class GoogleTranslator(BaseTranslator):
         @return: str: translated text
         """
 
-        if self._validate_payload(text):
-            text = text.strip()
+        if not self._validate_payload(text):
+            return
+        text = text.strip()
 
-            if self.payload_key:
-                self._url_params[self.payload_key] = text
-            response = requests.get(self.__base_url,
-                                    params=self._url_params,
-                                    proxies=self.proxies)
-            if response.status_code == 429:
-                raise TooManyRequests()
+        if self.payload_key:
+            self._url_params[self.payload_key] = text
+        response = requests.get(self.__base_url,
+                                params=self._url_params,
+                                proxies=self.proxies)
+        if response.status_code == 429:
+            raise TooManyRequests()
 
-            if response.status_code != 200:
-                raise RequestError()
+        if response.status_code != 200:
+            raise RequestError()
 
-            soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-            element = soup.find(self._element_tag, self._element_query)
+        element = soup.find(self._element_tag, self._element_query)
 
-            if not element:
-                element = soup.find(self._element_tag, self._alt_element_query)
-                if not element:
-                    raise TranslationNotFound(text)
-            if element.get_text(strip=True) == text.strip():
-                to_translate_alpha = ''.join(ch for ch in text.strip() if ch.isalnum())
-                translated_alpha = ''.join(ch for ch in element.get_text(strip=True) if ch.isalnum())
-                if to_translate_alpha and translated_alpha and to_translate_alpha == translated_alpha:
-                    self._url_params["tl"] = self._target
-                    if "hl" not in self._url_params:
-                        return text.strip()
-                    del self._url_params["hl"]
-                    return self.translate(text)
-
-            else:
-                return element.get_text(strip=True)
+        if not element:
+            element = soup.find(self._element_tag, self._alt_element_query)
+        if not element:
+            raise TranslationNotFound(text)
+        if element.get_text(strip=True) != text.strip():
+            return element.get_text(strip=True)
+        to_translate_alpha = ''.join(ch for ch in text.strip() if ch.isalnum())
+        translated_alpha = ''.join(ch for ch in element.get_text(strip=True) if ch.isalnum())
+        if to_translate_alpha and translated_alpha and to_translate_alpha == translated_alpha:
+            self._url_params["tl"] = self._target
+            if "hl" not in self._url_params:
+                return text.strip()
+            del self._url_params["hl"]
+            return self.translate(text)
 
     def translate_file(self, path, **kwargs):
         """
@@ -262,8 +265,7 @@ class GoogleTranslator(BaseTranslator):
         if not batch:
             raise Exception("Enter your text list that you want to translate")
         arr = []
-        for i, text in enumerate(batch):
-
+        for text in batch:
             translated = self.translate(text, **kwargs)
             arr.append(translated)
         return arr

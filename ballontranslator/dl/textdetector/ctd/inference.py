@@ -148,7 +148,7 @@ def model2annotations(model_path, img_dir_list, save_dir, save_json=False):
         img_dir_list = [img_dir_list]
     cuda = torch.cuda.is_available()
     device = 'cuda' if cuda else 'cpu'
-    model = TextDetector(model_path=model_path, detect_size=1024, device=device, act='leaky')  
+    model = TextDetector(model_path=model_path, detect_size=1024, device=device, act='leaky')
     imglist = []
     for img_dir in img_dir_list:
         imglist += find_all_imgs(img_dir, abs_path=True)
@@ -157,8 +157,8 @@ def model2annotations(model_path, img_dir_list, save_dir, save_json=False):
         img = cv2.imread(img_path)
         im_h, im_w = img.shape[:2]
         imname = imgname.replace(Path(imgname).suffix, '')
-        maskname = 'mask-'+imname+'.png'
-        poly_save_path = osp.join(save_dir, 'line-' + imname + '.txt')
+        maskname = f'mask-{imname}.png'
+        poly_save_path = osp.join(save_dir, f'line-{imname}.txt')
         mask, mask_refined, blk_list = model(img, refine_mode=REFINEMASK_ANNOTATION, keep_undetected_mask=True)
         polys = []
         blk_xyxy = []
@@ -173,7 +173,7 @@ def model2annotations(model_path, img_dir_list, save_dir, save_json=False):
             yolo_label = get_yololabel_strings(cls_list, blk_xyxy)
         else:
             yolo_label = ''
-        with open(osp.join(save_dir, imname+'.txt'), 'w', encoding='utf8') as f:
+        with open(osp.join(save_dir, f'{imname}.txt'), 'w', encoding='utf8') as f:
             f.write(yolo_label)
 
         # num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
@@ -191,7 +191,7 @@ def model2annotations(model_path, img_dir_list, save_dir, save_json=False):
             polys = polys.reshape(-1, 8)
             np.savetxt(poly_save_path, polys, fmt='%d')
         if save_json:
-            with open(osp.join(save_dir, imname+'.json'), 'w', encoding='utf8') as f:
+            with open(osp.join(save_dir, f'{imname}.json'), 'w', encoding='utf8') as f:
                 f.write(json.dumps(blk_dict_list, ensure_ascii=False, cls=NumpyEncoder))
         cv2.imwrite(osp.join(save_dir, imgname), img)
         cv2.imwrite(osp.join(save_dir, maskname), mask_refined)
@@ -205,10 +205,10 @@ def preprocess_img(img, detect_size=(1024, 1024), device='cpu', bgr2rgb=True, ha
     if to_tensor:
         img_in = img_in.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
         img_in = np.array([np.ascontiguousarray(img_in)]).astype(np.float32) / 255
-        if to_tensor:
-            img_in = torch.from_numpy(img_in).to(device)
-            if half:
-                img_in = img_in.half()
+    if to_tensor:
+        img_in = torch.from_numpy(img_in).to(device)
+        if half:
+            img_in = img_in.half()
     return img_in, ratio, int(dw), int(dh)
 
 def postprocess_mask(img: Union[torch.Tensor, np.ndarray], thresh=None):
@@ -275,7 +275,7 @@ class TextDetector:
     def set_device(self, device: str):
         if self.device == device:
             return
-        model_path = CTD_MODEL_PATH+'.onnx' if device == 'cpu' else CTD_MODEL_PATH
+        model_path = f'{CTD_MODEL_PATH}.onnx' if device == 'cpu' else CTD_MODEL_PATH
         if not osp.exists(model_path):
             raise FileNotFoundError(f'CTD model not found: {model_path}')
         self.load_model(model_path)
@@ -293,9 +293,7 @@ class TextDetector:
             for b in batch:
                 _, mask, lines = self.net(b)
                 if mask.shape[1] == 2:     # some version of opencv spit out reversed result
-                    tmp = mask
-                    mask = lines
-                    lines = tmp
+                    mask, lines = lines, mask
                 mask_lst.append(mask)
                 line_lst.append(lines)
             lines, mask = np.concatenate(line_lst, 0), np.concatenate(mask_lst, 0)
@@ -306,7 +304,7 @@ class TextDetector:
     @torch.no_grad()
     def __call__(self, img, refine_mode=REFINEMASK_INPAINT, keep_undetected_mask=False) -> Tuple[np.ndarray, np.ndarray, List[TextBlock]]:
         
-        detect_size = self.detect_size if not self.backend == 'opencv' else 1024
+        detect_size = self.detect_size if self.backend != 'opencv' else 1024
         im_h, im_w = img.shape[:2]
         lines_map, mask = det_rearrange_forward(img, self.det_batch_forward_ctd, detect_size, self.det_rearrange_max_batches, self.device)
         blks = []
@@ -316,9 +314,7 @@ class TextDetector:
             blks, mask, lines_map = self.net(img_in)
             if self.backend == 'opencv':
                 if mask.shape[1] == 2:     # some version of opencv spit out reversed result
-                    tmp = mask
-                    mask = lines_map
-                    lines_map = tmp
+                    mask, lines_map = lines_map, mask
             mask = mask.squeeze()
             resize_ratio = (im_w / (detect_size - dw), im_h / (detect_size - dh))
             blks = postprocess_yolo(blks, self.conf_thresh, self.nms_thresh, resize_ratio)
@@ -333,10 +329,7 @@ class TextDetector:
 
         # map output to input img
         mask = cv2.resize(mask, (im_w, im_h), interpolation=cv2.INTER_LINEAR)
-        if lines.size == 0:
-            lines = []
-        else:
-            lines = lines.astype(np.int32)
+        lines = [] if lines.size == 0 else lines.astype(np.int32)
         blk_list = group_output(blks, lines, im_w, im_h, mask)
         mask_refined = refine_mask(img, mask, blk_list, refine_mode=refine_mode)
         if keep_undetected_mask:

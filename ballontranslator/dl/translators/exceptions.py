@@ -13,7 +13,7 @@ class BaseError(Exception):
         super().__init__()
 
     def __str__(self):
-        return "{} --> {}".format(self.val, self.message)
+        return f"{self.val} --> {self.message}"
 
 
 class LanguageNotSupportedException(BaseError):
@@ -76,7 +76,7 @@ class NotValidLength(BaseError):
     """
 
     def __init__(self, val, min_chars, max_chars):
-        message = "Text length need to be between {} and {} characters".format(min_chars, max_chars)
+        message = f"Text length need to be between {min_chars} and {max_chars} characters"
         super(NotValidLength, self).__init__(val, message)
 
 
@@ -103,7 +103,7 @@ class MicrosoftAPIerror(Exception):
         self.message="Microsoft API returned the following error"
 
     def __str__(self):
-        return "{}: {}".format(self.message, self.api_message)
+        return f"{self.message}: {self.api_message}"
 
 
 class TooManyRequests(Exception):
@@ -140,7 +140,7 @@ class ServerException(Exception):
 
 class AuthorizationException(Exception):
     def __init__(self, api_key, *args):
-        msg = 'Unauthorized access with the api key ' + api_key
+        msg = f'Unauthorized access with the api key {api_key}'
         super().__init__(msg, *args)
 
 class TranslatorSetupFailure(Exception):

@@ -134,7 +134,7 @@ class SourceTextEdit(QTextEdit):
             self.text_content_changed = False
             if not self.highlighting:
                 self.text_changed.emit()
-                
+
         if self.hasFocus() and not self.pre_editing and not self.highlighting:
 
             if not self.in_redo_undo:
@@ -142,36 +142,35 @@ class SourceTextEdit(QTextEdit):
                 change_from = self.change_from
                 added_text = ''
                 input_method_used = False
-                
+
                 if self.ctrlv_pressed:
                     self.ctrlv_pressed = False
                     cursor = self.textCursor()
                     cursor.setPosition(change_from)
                     cursor.setPosition(self.textCursor().position(), QTextCursor.MoveMode.KeepAnchor)
                     added_text = cursor.selectedText()
-                
-                else:
-                    if self.input_method_from != -1:
-                        added_text = self.input_method_text
-                        change_from = self.input_method_from
-                        input_method_used = True
-                    elif self.change_added > 0:
-                        text = self.toPlainText()
-                        len_text = len(text)
-                        cursor = self.textCursor()
-                        
-                        if self.change_added >  len_text or change_from + self.change_added > len_text:
-                            self.change_added = 1
-                            change_from = self.textCursor().position() - 1
-                            cursor.setPosition(change_from)
-                            cursor.setPosition(change_from + self.change_added, QTextCursor.MoveMode.KeepAnchor)
-                            added_text = cursor.selectedText()
-                            if added_text == '…' or added_text == '—':
-                                    self.change_added = 2
-                                    change_from -= 1
+
+                elif self.input_method_from != -1:
+                    added_text = self.input_method_text
+                    change_from = self.input_method_from
+                    input_method_used = True
+                elif self.change_added > 0:
+                    text = self.toPlainText()
+                    len_text = len(text)
+                    cursor = self.textCursor()
+
+                    if self.change_added >  len_text or change_from + self.change_added > len_text:
+                        self.change_added = 1
+                        change_from = self.textCursor().position() - 1
                         cursor.setPosition(change_from)
-                        cursor.setPosition(change_from + self.change_added, QTextCursor.MoveMode.KeepAnchor) 
+                        cursor.setPosition(change_from + self.change_added, QTextCursor.MoveMode.KeepAnchor)
                         added_text = cursor.selectedText()
+                        if added_text in ['…', '—']:
+                            self.change_added = 2
+                            change_from -= 1
+                    cursor.setPosition(change_from)
+                    cursor.setPosition(change_from + self.change_added, QTextCursor.MoveMode.KeepAnchor)
+                    added_text = cursor.selectedText()
 
                 self.propagate_user_edited.emit(change_from, added_text, input_method_used)
                 undo_steps = self.document().availableUndoSteps()

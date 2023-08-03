@@ -52,10 +52,11 @@ def check_language_support(check_type: str = 'source'):
                 supported_lang_list = self.supported_src_list
             else:
                 supported_lang_list = self.supported_tgt_list
-            if not lang in supported_lang_list:
+            if lang not in supported_lang_list:
                 msg = '\n'.join(supported_lang_list)
                 raise InvalidSourceOrTargetLanguage(f'Invalid {check_type}: {lang}\n', message=msg)
             return set_lang_method(self, lang)
+
         return wrapper
 
     return decorator
@@ -73,17 +74,20 @@ class TranslatorBase(ModuleParamParser):
                  raise_unsupported_lang: bool = True,
                  **setup_params) -> None:
         super().__init__(**setup_params)
-        self.name = ''
-        for key in TRANSLATORS.module_dict:
-            if TRANSLATORS.module_dict[key] == self.__class__:
-                self.name = key
-                break
+        self.name = next(
+            (
+                key
+                for key in TRANSLATORS.module_dict
+                if TRANSLATORS.module_dict[key] == self.__class__
+            ),
+            '',
+        )
         self.textblk_break = '\n###\n'
         self.lang_source: str = lang_source
         self.lang_target: str = lang_target
         self.lang_map: Dict = LANGMAP_GLOBAL.copy()
         self.postprocess_hooks = OrderedSet()
-        
+
         try:
             self.setup_translator()
         except Exception as e:
@@ -100,11 +104,10 @@ class TranslatorBase(ModuleParamParser):
         except InvalidSourceOrTargetLanguage as e:
             if raise_unsupported_lang:
                 raise e
-            else:
-                lang_source = self.supported_src_list[0]
-                lang_target = self.supported_tgt_list[0]
-                self.set_source(lang_source)
-                self.set_target(lang_target)
+            lang_source = self.supported_src_list[0]
+            lang_target = self.supported_tgt_list[0]
+            self.set_source(lang_source)
+            self.set_target(lang_target)
 
         if self.cht_require_convert:
             self.register_postprocess_hooks(self._chs2cht)
@@ -140,17 +143,14 @@ class TranslatorBase(ModuleParamParser):
 
         concate_text = isinstance(text, List) and self.concate_text
         text_source = self.textlist2text(text) if concate_text else text
-        
+
         text_trans = self._translate(text_source)
-        
+
         if text_trans is None:
-            if isinstance(text, List):
-                text_trans = [''] * len(text)
-            else:
-                text_trans = ''
+            text_trans = [''] * len(text) if isinstance(text, List) else ''
         elif concate_text:
             text_trans = self.text2textlist(text_trans)
-            
+
         if isinstance(text, List):
             assert len(text_trans) == len(text)
             for ii, t in enumerate(text_trans):
@@ -192,15 +192,11 @@ class TranslatorBase(ModuleParamParser):
         return self.valid_lang_list
     
     def _chs2cht(self, text: str, blk: TextBlock = None):
-        if self.lang_target == '繁體中文':
-            return chs2cht(text)
-        else:
-            return text
+        return chs2cht(text) if self.lang_target == '繁體中文' else text
         
     def delay(self) -> float:
         if 'delay' in self.setup_params:
-            delay = self.setup_params['delay']
-            if delay:
+            if delay := self.setup_params['delay']:
                 try:
                     return float(delay)
                 except:
@@ -254,9 +250,7 @@ class GoogleTranslator(TranslatorBase):
         self.googletrans._target = self.lang_map[self.lang_target]
         self.googletrans._url_params['tl'] = self.lang_map[self.lang_target]
         self.googletrans.__base_url = self.setup_params['url']['select']
-        translations = self.googletrans.translate(text)
-
-        return translations
+        return self.googletrans.translate(text)
 
 
 @register_translator('papago')
@@ -280,37 +274,37 @@ class PapagoTranslator(TranslatorBase):
         self.lang_map['português'] = 'pt'
         self.lang_map['русский язык'] = 'ru'
         self.lang_map['español'] = 'es'        
-        
+
         if self.papagoVer is None:
             script = requests.get('https://papago.naver.com', proxies=PROXY)
-            mainJs = re.search(r'\/(main.*\.js)', script.text).group(1)
-            papagoVerData = requests.get('https://papago.naver.com/' + mainJs, proxies=PROXY)
-            papagoVer = re.search(r'"PPG .*,"(v[^"]*)', papagoVerData.text).group(1)
+            mainJs = re.search(r'\/(main.*\.js)', script.text)[1]
+            papagoVerData = requests.get(
+                f'https://papago.naver.com/{mainJs}', proxies=PROXY
+            )
+            papagoVer = re.search(r'"PPG .*,"(v[^"]*)', papagoVerData.text)[1]
             self.papagoVer = PapagoTranslator.papagoVer = papagoVer
 
     def _translate(self, text: Union[str, List]) -> Union[str, List]:
-        data = {}
-        data['source'] = self.lang_map[self.lang_source]
-        data['target'] = self.lang_map[self.lang_target]
-        data['text'] = text
-        data['honorific'] = "false"
-
+        data = {
+            'source': self.lang_map[self.lang_source],
+            'target': self.lang_map[self.lang_target],
+            'text': text,
+            'honorific': "false",
+        }
         PAPAGO_URL = 'https://papago.naver.com/apis/n2mt/translate'
         guid = uuid.uuid4()
         timestamp = int(time.time() * 1000)
         key = self.papagoVer.encode("utf-8")
         code = f"{guid}\n{PAPAGO_URL}\n{timestamp}".encode("utf-8")
         token = base64.b64encode(hmac.new(key, code, "MD5").digest()).decode("utf-8")
-        
+
         headers = {
             "Authorization": f"PPG {guid}:{token}",
             "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
             "Timestamp": str(timestamp),
         }
         resp = requests.post(PAPAGO_URL, data, headers=headers)
-        translations = resp.json()['translatedText']
-    
-        return translations
+        return resp.json()['translatedText']
         
 
 @register_translator('caiyun')
@@ -336,7 +330,9 @@ class CaiyunTranslator(TranslatorBase):
         if token == '' or token is None:
             raise MissingTranslatorParams('token')
 
-        direction = self.lang_map[self.lang_source] + '2' + self.lang_map[self.lang_target]
+        direction = (
+            f'{self.lang_map[self.lang_source]}2{self.lang_map[self.lang_target]}'
+        )
 
         payload = {
             "source": text,
@@ -347,13 +343,11 @@ class CaiyunTranslator(TranslatorBase):
 
         headers = {
             "content-type": "application/json",
-            "x-authorization": "token " + token,
+            "x-authorization": f"token {token}",
         }
 
         response = requests.request("POST", url, data=json.dumps(payload), headers=headers)
-        translations = json.loads(response.text)["target"]
-
-        return translations
+        return json.loads(response.text)["target"]
 
 
 @register_translator('baidu')
@@ -373,15 +367,14 @@ class BaiduTranslator(TranslatorBase):
         m1 = hashlib.md5()
         m1.update(sign)
         sign = m1.hexdigest()
-        payload = {
+        return {
             "appid": BAIDU_APP_ID,
             "q": query_text,
             "from": from_lang,
             "to": to_lang,
-            "salt":str(salt),
-            "sign":sign
+            "salt": str(salt),
+            "sign": sign,
         }
-        return payload
 
     def _setup_translator(self):
         self.lang_map['简体中文'] = 'zh'
@@ -403,7 +396,7 @@ class BaiduTranslator(TranslatorBase):
             raise MissingTranslatorParams('token')
         if appId == '' or appId is None:
             raise MissingTranslatorParams('appId')
-        
+
         payload = self.get_json(self.lang_map[self.lang_source], self.lang_map[self.lang_target], '\n'.join(n_queries),appId,token)
         headers = {
             "Content-Type": "application/x-www-form-urlencoded"
@@ -415,9 +408,7 @@ class BaiduTranslator(TranslatorBase):
         if "trans_result" not in result:
             raise MissingTranslatorParams(f'Baidu returned invalid response: {result}\nAre the API keys set correctly?')
         for ret in result["trans_result"]:
-            for v in ret["dst"].split('\n'):
-                result_list.append(v)
-
+            result_list.extend(iter(ret["dst"].split('\n')))
         # Join queries that had \n back together
         translations = []
         i = 0
@@ -477,7 +468,9 @@ class DeeplTranslator(TranslatorBase):
 
 
 SUGOIMODEL_TRANSLATOR_DIRPATH = 'data/models/sugoi_translator/'
-SUGOIMODEL_TOKENIZATOR_PATH = SUGOIMODEL_TRANSLATOR_DIRPATH + "spm.ja.nopretok.model"
+SUGOIMODEL_TOKENIZATOR_PATH = (
+    f"{SUGOIMODEL_TRANSLATOR_DIRPATH}spm.ja.nopretok.model"
+)
 @register_translator('Sugoi')
 class SugoiTranslator(TranslatorBase):
 
@@ -502,15 +495,13 @@ class SugoiTranslator(TranslatorBase):
         if isinstance(text, str):
             text = [text]
             input_is_lst = False
-        
+
         text = [i.replace(".", "@").replace("．", "@") for i in text]
         tokenized_text = self.tokenizator.encode(text, out_type=str, enable_sampling=True, alpha=0.1, nbest_size=-1)
         tokenized_translated = self.translator.translate_batch(tokenized_text)
         text_translated = [''.join(text[0]["tokens"]).replace('▁', ' ').replace("@", ".") for text in tokenized_translated]
-        
-        if not input_is_lst:
-            return text_translated[0]
-        return text_translated
+
+        return text_translated[0] if not input_is_lst else text_translated
 
     def updateParam(self, param_key: str, param_content):
         super().updateParam(param_key, param_content)
