@@ -27,7 +27,7 @@ class SizeComboBox(QComboBox):
 
     def keyPressEvent(self, e: QKeyEvent) -> None:
         key = e.key()
-        if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter:
+        if key in [Qt.Key.Key_Return, Qt.Key.Key_Enter]:
             self.check_change()
         super().keyPressEvent(e)
 

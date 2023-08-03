@@ -40,13 +40,10 @@ class HighlightMatched(QSyntaxHighlighter):
 
     def __init__(self, edit: SourceTextEdit, matched_map: dict = None):
         super().__init__(edit.document())
-        
+
         self.case_sensitive = False
         self.whole_word = False
-        if matched_map is None:
-            self.matched_map: Dict = {}
-        else:
-            self.matched_map = matched_map
+        self.matched_map = {} if matched_map is None else matched_map
         self.current_start = -1
         self.edit = edit
 
@@ -436,14 +433,12 @@ class PageSearchWidget(Widget):
         search_src = search_range == 1
         search_trans = search_range == 0
 
-        if search_src:
-            for pw in self.pairwidget_list:
+        for pw in self.pairwidget_list:
+            if search_src:
                 self.find_page_text(pw.e_source)
-        elif search_trans:
-            for pw in self.pairwidget_list:
+            elif search_trans:
                 self.find_page_text(pw.e_trans)
-        else:
-            for pw in self.pairwidget_list:
+            else:
                 self.find_page_text(pw.e_source)
                 self.find_page_text(pw.e_trans)
 
@@ -586,19 +581,29 @@ class PageSearchWidget(Widget):
         if self.current_highlighter is None:
             return None
         matched: Matched
-        for _, matched in self.current_highlighter.matched_map.items():
-            if matched.start > cursor_sel_start:
-                return matched
-        return None
+        return next(
+            (
+                matched
+                for _, matched in self.current_highlighter.matched_map.items()
+                if matched.start > cursor_sel_start
+            ),
+            None,
+        )
 
     def get_prev_match(self, cursor_sel_end: int) -> Matched:
         if self.current_highlighter is None:
             return None
         matched: Matched
-        for _, matched in reversed(self.current_highlighter.matched_map.items()):
-            if matched.end < cursor_sel_end:
-                return matched
-        return None
+        return next(
+            (
+                matched
+                for _, matched in reversed(
+                    self.current_highlighter.matched_map.items()
+                )
+                if matched.end < cursor_sel_end
+            ),
+            None,
+        )
 
     def move_cursor(self, step: int = 1) -> int:
         cursor_reset = 0
@@ -638,7 +643,7 @@ class PageSearchWidget(Widget):
         if idx != -1:
             self.highlighter_list[idx].set_current_span(self.current_cursor.selectionStart(), self.current_cursor.selectionEnd())
 
-        if old_idx != -1 and old_idx != idx:
+        if old_idx not in [-1, idx]:
             self.highlighter_list[old_idx].set_current_span(-1, -1)
 
         if self.isVisible():
@@ -711,7 +716,7 @@ class PageSearchWidget(Widget):
             return
 
         if type(edit) == SourceTextEdit and self.range_combobox.currentIndex() == 0 \
-            or type(edit) == TransPairWidget and self.range_combobox.currentIndex() == 1:
+                or type(edit) == TransPairWidget and self.range_combobox.currentIndex() == 1:
             return
 
         text = self.search_editor.toPlainText()
@@ -721,14 +726,14 @@ class PageSearchWidget(Widget):
         found_counter, match_map = self._match_text(edit.toPlainText())
         if found_counter > 0:
             current_idx = self.current_edit_index()
-            insert_idx = 0
-            for e in self.search_rstedit_list:
-                if e.idx < edit.idx:
-                    insert_idx += 1
-                elif e.idx == edit.idx:
-                    if type(edit) == TransTextEdit:
-                        insert_idx += 1
-
+            insert_idx = sum(
+                1
+                for e in self.search_rstedit_list
+                if e.idx >= edit.idx
+                and e.idx == edit.idx
+                and type(edit) == TransTextEdit
+                or e.idx < edit.idx
+            )
             self.search_counter_list.insert(insert_idx, found_counter)
             self.search_rstedit_list.insert(insert_idx, edit)
             self.highlighter_list.insert(insert_idx, HighlightMatched(edit, match_map))
@@ -738,9 +743,8 @@ class PageSearchWidget(Widget):
             if current_idx != -1 and current_idx >= insert_idx:
                 self.result_pos += found_counter
                 self.updateCounterText()
+            elif self.update_cursor_on_insert:
+                self.result_pos = 0
+                self.setCurrentEditor(edit)
             else:
-                if self.update_cursor_on_insert:
-                    self.result_pos = 0
-                    self.setCurrentEditor(edit)
-                else:
-                    self.updateCounterText()
+                self.updateCounterText()

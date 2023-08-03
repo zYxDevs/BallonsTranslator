@@ -46,10 +46,7 @@ class ConfigSubBlock(Widget):
         super().__init__()
         self.idx0: int = None
         self.idx1: int = None
-        if vertical_layout:
-            layout = QVBoxLayout(self)
-        else:
-            layout = QHBoxLayout(self)
+        layout = QVBoxLayout(self) if vertical_layout else QHBoxLayout(self)
         self.name = name
         if name is not None:
             textlabel = ConfigTextLabel(name, CONFIG_FONTSIZE_CONTENT, QFont.Weight.Normal)
@@ -93,7 +90,7 @@ class ConfigBlock(Widget):
         le.setFixedWidth(CONFIG_COMBOBOX_MIDEAN)
         le.setFixedHeight(45)
         sublock = ConfigSubBlock(le, name, discription, vertical_layout)
-        if vertical_layout is False:
+        if not vertical_layout:
             sublock.layout().addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding))
         self.addSublock(sublock)
         sublock.layout().setSpacing(20)
@@ -142,7 +139,7 @@ class ConfigBlock(Widget):
         else:
             vertical_layout = False
         sublock = ConfigSubBlock(checkbox, name, vertical_layout=vertical_layout)
-        if vertical_layout is False:
+        if not vertical_layout:
             sublock.layout().addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding))
         self.addSublock(sublock)
         return checkbox
@@ -174,10 +171,7 @@ class ConfigContent(QScrollArea):
         if self.active_label is not None:
             self.deactiveLabel()
         block = self.config_block_list[idx0]
-        if idx1 >= 0:
-            self.active_label = block.label_list[idx1]
-        else:
-            self.active_label = block.header
+        self.active_label = block.label_list[idx1] if idx1 >= 0 else block.header
         self.active_label.setActiveBackground()
         self.ensureWidgetVisible(self.active_label, yMargin=self.active_label.height() * 7)
 
@@ -207,13 +201,12 @@ class TreeModel(QStandardItemModel):
     def data(self, index, role):
         if not index.isValid():
             return None
-        if role == Qt.ItemDataRole.SizeHintRole:
-            size = QSize()
-            item = self.itemFromIndex(index)
-            size.setHeight(item.font().pointSize()+20)
-            return size
-        else:
+        if role != Qt.ItemDataRole.SizeHintRole:
             return super().data(index, role)
+        size = QSize()
+        item = self.itemFromIndex(index)
+        size.setHeight(item.font().pointSize()+20)
+        return size
 
 
 class ConfigTable(QTreeView):
@@ -428,8 +421,7 @@ class ConfigPanel(Widget):
         self.config.textselect_mini_menu = self.selectext_minimenu_checker.isChecked()
 
     def on_saladict_shortcut_changed(self):
-        kstr = self.saladict_shortcut.keySequence().toString()
-        if kstr:
+        if kstr := self.saladict_shortcut.keySequence().toString():
             self.config.saladict_shortcut = self.saladict_shortcut.keySequence().toString()
 
     def on_searchurl_changed(self):

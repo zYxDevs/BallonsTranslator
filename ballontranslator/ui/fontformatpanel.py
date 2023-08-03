@@ -162,9 +162,7 @@ class QFontChecker(QCheckBox):
 
 class AlignmentChecker(QCheckBox):
     def mousePressEvent(self, event: QMouseEvent) -> None:
-        if self.isChecked():
-            return event.accept()
-        return super().mousePressEvent(event)
+        return event.accept() if self.isChecked() else super().mousePressEvent(event)
 
 
 class AlignmentBtnGroup(QFrame):
@@ -326,10 +324,7 @@ class SizeControlLabel(QLabel):
     def mousePressEvent(self, e: QMouseEvent) -> None:
         if e.button() == Qt.MouseButton.LeftButton:
             self.mouse_pressed = True
-            if C.FLAG_QT6:
-                g_pos = e.globalPosition().toPoint()
-            else:
-                g_pos = e.globalPos()
+            g_pos = e.globalPosition().toPoint() if C.FLAG_QT6 else e.globalPos()
             self.cur_pos = g_pos.x() if self.direction == 0 else g_pos.y()
         return super().mousePressEvent(e)
 
@@ -341,10 +336,7 @@ class SizeControlLabel(QLabel):
 
     def mouseMoveEvent(self, e: QMouseEvent) -> None:
         if self.mouse_pressed:
-            if C.FLAG_QT6:
-                g_pos = e.globalPosition().toPoint()
-            else:
-                g_pos = e.globalPos()
+            g_pos = e.globalPosition().toPoint() if C.FLAG_QT6 else e.globalPos()
             if self.direction == 0:
                 new_pos = g_pos.x()
                 self.size_ctrl_changed.emit(new_pos - self.cur_pos)
@@ -646,12 +638,11 @@ class FontFormatPanel(Widget):
                 self.textblk_item = None
                 self.set_active_format(self.global_format)
                 self.fontfmtLabel.setText(self.global_fontfmt_str)
-        else:
-            if not self.restoring_textblk:
-                blk_fmt = textblk_item.get_fontformat()
-                self.textblk_item = textblk_item
-                self.set_active_format(blk_fmt)
-                self.fontfmtLabel.setText(f'TextBlock #{textblk_item.idx}')
+        elif not self.restoring_textblk:
+            blk_fmt = textblk_item.get_fontformat()
+            self.textblk_item = textblk_item
+            self.set_active_format(blk_fmt)
+            self.fontfmtLabel.setText(f'TextBlock #{textblk_item.idx}')
 
     def on_effectbtn_clicked(self):
         self.effect_panel.active_fontfmt = self.active_format

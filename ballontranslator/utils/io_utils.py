@@ -43,8 +43,7 @@ def find_all_imgs(img_dir, abs_path=False):
 def imread(imgpath, read_type=cv2.IMREAD_COLOR):
     if not osp.exists(imgpath):
         return None
-    img = cv2.imdecode(np.fromfile(imgpath, dtype=np.uint8), read_type)
-    return img
+    return cv2.imdecode(np.fromfile(imgpath, dtype=np.uint8), read_type)
 
 def imwrite(img_path, img, ext='.png'):
     suffix = Path(img_path).suffix

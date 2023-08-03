@@ -20,8 +20,7 @@ def write_jpg_metadata(imgpath: str, metadata="a metadata"):
 def read_jpg_metadata(imgpath: str):
     exif_dict = piexif.load(imgpath)
     user_comment = piexif.helper.UserComment.load(exif_dict["Exif"][piexif.ExifIFD.UserComment])
-    bubdict = json.loads(user_comment)
-    return bubdict
+    return json.loads(user_comment)
 
 
 class ProjImgTrans:
@@ -50,17 +49,15 @@ class ProjImgTrans:
         return self._idx2pagename[idx]
 
     def pagename2idx(self, pagename: str) -> int:
-        if pagename in self.pages:
-            return self._pagename2idx[pagename]
-        return -1
+        return self._pagename2idx[pagename] if pagename in self.pages else -1
 
     def proj_name(self) -> str:
-        return self.type+'_'+osp.basename(self.directory)
+        return f'{self.type}_{osp.basename(self.directory)}'
 
     def load(self, directory: str, json_path: str = None) -> bool:
         self.directory = directory
         if json_path is None:
-            self.proj_path = osp.join(self.directory, self.proj_name() + '.json')
+            self.proj_path = osp.join(self.directory, f'{self.proj_name()}.json')
         else:
             self.proj_path = json_path
         new_proj = False
@@ -127,7 +124,7 @@ class ProjImgTrans:
             set_img_failed = True
             LOGGER.warning(f'{current_img} not found.')
         if set_img_failed:
-            if len(self.pages) > 0:
+            if self.pages:
                 self.set_current_img_byidx(0)
 
     def load_from_json(self, json_path: str):
@@ -163,7 +160,7 @@ class ProjImgTrans:
     def set_current_img_byidx(self, idx: int):
         num_pages = self.num_pages
         if idx < 0:
-            idx = idx + self.num_pages
+            idx += self.num_pages
         if idx < 0 or idx > num_pages - 1:
             self.set_current_img(None)
         else:
@@ -241,15 +238,15 @@ class ProjImgTrans:
     def get_mask_path(self, imgname: str = None) -> str:
         if imgname is None:
             imgname = self.current_img
-        return osp.join(self.mask_dir(), osp.splitext(imgname)[0]+'.png')
+        return osp.join(self.mask_dir(), f'{osp.splitext(imgname)[0]}.png')
 
     def get_inpainted_path(self, imgname: str = None) -> str:
         if imgname is None:
             imgname = self.current_img
-        return osp.join(self.inpainted_dir(), osp.splitext(imgname)[0]+'.png')
+        return osp.join(self.inpainted_dir(), f'{osp.splitext(imgname)[0]}.png')
 
     def get_result_path(self, imgname: str) -> str:
-        return osp.join(self.result_dir(), osp.splitext(imgname)[0]+'.png')
+        return osp.join(self.result_dir(), f'{osp.splitext(imgname)[0]}.png')
         
     def backup(self):
         raise NotImplementedError
@@ -281,14 +278,13 @@ class ProjImgTrans:
             self.set_current_img(self.idx2pagename(next_idx))
 
     def current_block_list(self) -> List[TextBlock]:
-        if self.current_img is not None:
-            assert self.current_img in self.pages
-            return self.pages[self.current_img]
-        else:
+        if self.current_img is None:
             return None
+        assert self.current_img in self.pages
+        return self.pages[self.current_img]
 
     def doc_path(self) -> str:
-        return os.path.join(self.directory, self.proj_name() + ".docx")
+        return os.path.join(self.directory, f"{self.proj_name()}.docx")
 
     def doc_exist(self) -> bool:
         return osp.exists(self.doc_path())
@@ -360,15 +356,15 @@ class ProjImgTrans:
                     translation = translation[:-1]
                     if len(translation) != 0 and translation[0] == "\n":
                         translation = translation[1:]
-                    bubpath = os.path.join(tmp_bubble_folder, "image"+str(bub_index)+".jpg")
+                    bubpath = os.path.join(tmp_bubble_folder, f"image{bub_index}.jpg")
 
                     meta_dict = read_jpg_metadata(bubpath)
                     meta_dict["translation"] = translation
                     imgkey = meta_dict.pop("imgkey")
-                    if not imgkey in pages:
+                    if imgkey not in pages:
                         pages[imgkey] = []
                     pages[imgkey].append(TextBlock(**meta_dict))
-                    
+
                     if fin_page_signal is not None:
                         fin_page_signal.emit()
 
@@ -380,20 +376,18 @@ class ProjImgTrans:
         if self.pages is None:
             self.pages = {}
         src_dict = self.pages if self.pages is not None else {}
-        key_lst = list(dict.fromkeys(list(src_dict.keys()) + list(tgt_dict.keys())))
-        key_lst.sort()
+        key_lst = sorted(dict.fromkeys(list(src_dict.keys()) + list(tgt_dict.keys())))
         rst_dict = {}
         pagename2idx = {}
         idx2pagename = {}
-        page_counter = 0
-        for key in key_lst:
-            if key in src_dict and not key in tgt_dict:
-                rst_dict[key] = src_dict[key]
-            else:
-                rst_dict[key] = tgt_dict[key]
+        for page_counter, key in enumerate(key_lst):
+            rst_dict[key] = (
+                src_dict[key]
+                if key in src_dict and key not in tgt_dict
+                else tgt_dict[key]
+            )
             pagename2idx[key] = page_counter
             idx2pagename[page_counter] = key
-            page_counter += 1
         self.pages.clear()
         self.pages.update(rst_dict)
         self._pagename2idx = pagename2idx

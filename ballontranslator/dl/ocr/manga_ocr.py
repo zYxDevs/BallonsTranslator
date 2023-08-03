@@ -55,8 +55,8 @@ if __name__ == '__main__':
     # img = (torch.from_numpy(img[np.newaxis, ...]).float() - 127.5) / 127.5
     # img = einops.rearrange(img, 'N H W C -> N C H W')
     import time
-    
-    for ii in range(10):
+
+    for _ in range(10):
         t0 = time.time()
         out = manga_ocr(dummy)
         print(out, time.time() - t0)

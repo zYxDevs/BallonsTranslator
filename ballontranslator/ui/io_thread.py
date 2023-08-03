@@ -29,7 +29,7 @@ class ThreadBase(QThread):
 
     def handleRunTimeException(self, msg: str, detail: str = None, verbose: str = ''):
         if detail is not None:
-            msg += ': ' + detail
+            msg += f': {detail}'
         LOGGER.error(msg + '\n' + verbose)
         err = QMessageBox()
         err.setText(msg)
@@ -53,7 +53,7 @@ class ImgSaveThread(ThreadBase):
             if len(self.im_save_list) == 0:
                 break
             save_path, img, pagename_in_proj = self.im_save_list.pop(0)
-            if isinstance(img, QImage) or isinstance(img, QPixmap):
+            if isinstance(img, (QImage, QPixmap)):
                 img.save(save_path)
             elif isinstance(img, np.ndarray):
                 imwrite(save_path, img)

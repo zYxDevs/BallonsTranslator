@@ -14,20 +14,19 @@ def iou_rotate(box_a, box_b, method='union'):
     r1 = cv2.rotatedRectangleIntersection(rect_a, rect_b)
     if r1[0] == 0:
         return 0
+    inter_area = cv2.contourArea(r1[1])
+    area_a = cv2.contourArea(box_a)
+    area_b = cv2.contourArea(box_b)
+    union_area = area_a + area_b - inter_area
+    if union_area == 0 or inter_area == 0:
+        return 0
+    if method == 'intersection':
+        iou = inter_area / min(area_a, area_b)
+    elif method == 'union':
+        iou = inter_area / union_area
     else:
-        inter_area = cv2.contourArea(r1[1])
-        area_a = cv2.contourArea(box_a)
-        area_b = cv2.contourArea(box_b)
-        union_area = area_a + area_b - inter_area
-        if union_area == 0 or inter_area == 0:
-            return 0
-        if method == 'union':
-            iou = inter_area / union_area
-        elif method == 'intersection':
-            iou = inter_area / min(area_a, area_b)
-        else:
-            raise NotImplementedError
-        return iou
+        raise NotImplementedError
+    return iou
 
 class SegDetectorRepresenter():
     def __init__(self, thresh=0.3, box_thresh=0.7, max_candidates=1000, unclip_ratio=1.5):
@@ -103,11 +102,10 @@ class SegDetectorRepresenter():
             if self.box_thresh > score:
                 continue
 
-            if points.shape[0] > 2:
-                box = self.unclip(points, unclip_ratio=self.unclip_ratio)
-                if len(box) > 1:
-                    continue
-            else:
+            if points.shape[0] <= 2:
+                continue
+            box = self.unclip(points, unclip_ratio=self.unclip_ratio)
+            if len(box) > 1:
                 continue
             box = box.reshape(-1, 2)
             _, sside = self.get_mini_boxes(box.reshape((-1, 1, 2)))
@@ -174,8 +172,7 @@ class SegDetectorRepresenter():
         distance = poly.area * unclip_ratio / poly.length
         offset = pyclipper.PyclipperOffset()
         offset.AddPath(box, pyclipper.JT_ROUND, pyclipper.ET_CLOSEDPOLYGON)
-        expanded = np.array(offset.Execute(distance))
-        return expanded
+        return np.array(offset.Execute(distance))
 
     def get_mini_boxes(self, contour):
         bounding_box = cv2.minAreaRect(contour)
@@ -324,8 +321,11 @@ class DetectionIoUEvaluator(object):
             if dontCare:
                 gtDontCarePolsNum.append(len(gtPols) - 1)
 
-        evaluationLog += "GT polygons: " + str(len(gtPols)) + (" (" + str(len(
-            gtDontCarePolsNum)) + " don't care)\n" if len(gtDontCarePolsNum) > 0 else "\n")
+        evaluationLog += f"GT polygons: {len(gtPols)}" + (
+            (f" ({len(gtDontCarePolsNum)}" + " don't care)\n")
+            if gtDontCarePolsNum
+            else "\n"
+        )
 
         for n in range(len(pred)):
             points = pred[n]['points']
@@ -335,7 +335,7 @@ class DetectionIoUEvaluator(object):
             detPol = points
             detPols.append(detPol)
             detPolPoints.append(points)
-            if len(gtDontCarePolsNum) > 0:
+            if gtDontCarePolsNum:
                 for dontCarePol in gtDontCarePolsNum:
                     dontCarePol = gtPols[dontCarePol]
                     intersected_area = get_intersection(dontCarePol, detPol)
@@ -345,10 +345,13 @@ class DetectionIoUEvaluator(object):
                         detDontCarePolsNum.append(len(detPols) - 1)
                         break
 
-        evaluationLog += "DET polygons: " + str(len(detPols)) + (" (" + str(len(
-            detDontCarePolsNum)) + " don't care)\n" if len(detDontCarePolsNum) > 0 else "\n")
+        evaluationLog += f"DET polygons: {len(detPols)}" + (
+            (f" ({len(detDontCarePolsNum)}" + " don't care)\n")
+            if detDontCarePolsNum
+            else "\n"
+        )
 
-        if len(gtPols) > 0 and len(detPols) > 0:
+        if gtPols and detPols:
             # Calculate IoU and precision matrixs
             outputShape = [len(gtPols), len(detPols)]
             iouMat = np.empty(outputShape)
@@ -379,7 +382,7 @@ class DetectionIoUEvaluator(object):
                             pairs.append({'gt': gtNum, 'det': detNum})
                             detMatchedNums.append(detNum)
                             evaluationLog += "Match GT #" + \
-                                             str(gtNum) + " with Det #" + str(detNum) + "\n"
+                                                 str(gtNum) + " with Det #" + str(detNum) + "\n"
 
         numGtCare = (len(gtPols) - len(gtDontCarePolsNum))
         numDetCare = (len(detPols) - len(detDontCarePolsNum))
@@ -392,7 +395,7 @@ class DetectionIoUEvaluator(object):
                 detMatched) / numDetCare
 
         hmean = 0 if (precision + recall) == 0 else 2.0 * \
-                                                    precision * recall / (precision + recall)
+                                                        precision * recall / (precision + recall)
 
         matchedSum += detMatched
         numGlobalCareGt += numGtCare
@@ -430,13 +433,14 @@ class DetectionIoUEvaluator(object):
         methodPrecision = 0 if numGlobalCareDet == 0 else float(
             matchedSum) / numGlobalCareDet
         methodHmean = 0 if methodRecall + methodPrecision == 0 else 2 * \
-                                                                    methodRecall * methodPrecision / (
+                                                                        methodRecall * methodPrecision / (
                                                                             methodRecall + methodPrecision)
 
-        methodMetrics = {'precision': methodPrecision,
-                         'recall': methodRecall, 'hmean': methodHmean}
-
-        return methodMetrics
+        return {
+            'precision': methodPrecision,
+            'recall': methodRecall,
+            'hmean': methodHmean,
+        }
 
 class QuadMetric():
     def __init__(self, is_output_polygon=False):
@@ -464,13 +468,12 @@ class QuadMetric():
             if self.is_output_polygon:
                 pred = [dict(points=pred_polygons[i]) for i in range(len(pred_polygons))]
             else:
-                pred = []
-                # print(pred_polygons.shape)
-                for i in range(pred_polygons.shape[0]):
-                    if pred_scores[i] >= box_thresh:
-                        # print(pred_polygons[i,:,:].tolist())
-                        pred.append(dict(points=pred_polygons[i, :, :].astype(np.int64)))
-                # pred = [dict(points=pred_polygons[i,:,:].tolist()) if pred_scores[i] >= box_thresh for i in range(pred_polygons.shape[0])]
+                pred = [
+                    dict(points=pred_polygons[i, :, :].astype(np.int64))
+                    for i in range(pred_polygons.shape[0])
+                    if pred_scores[i] >= box_thresh
+                ]
+                        # pred = [dict(points=pred_polygons[i,:,:].tolist()) if pred_scores[i] >= box_thresh for i in range(pred_polygons.shape[0])]
             results.append(self.evaluator.evaluate_image(gt, pred))
         return results
 

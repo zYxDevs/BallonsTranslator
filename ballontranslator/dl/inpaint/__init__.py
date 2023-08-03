@@ -19,11 +19,14 @@ class InpainterBase(ModuleParamParser):
     check_need_inpaint = True
     def __init__(self, **setup_params) -> None:
         super().__init__(**setup_params)
-        self.name = ''
-        for key in INPAINTERS.module_dict:
-            if INPAINTERS.module_dict[key] == self.__class__:
-                self.name = key
-                break
+        self.name = next(
+            (
+                key
+                for key in INPAINTERS.module_dict
+                if INPAINTERS.module_dict[key] == self.__class__
+            ),
+            '',
+        )
         self.setup_inpainter()
 
     def setup_inpainter(self):
@@ -157,7 +160,7 @@ class AOTInpainter(InpainterBase):
         else:
             self.model = AOTMODEL
             self.model.to(self.device)
-        self.inpaint_by_block = True if self.device == 'cuda' else False
+        self.inpaint_by_block = self.device == 'cuda'
         self.inpaint_size = int(self.setup_params['inpaint_size']['select'])
 
     def inpaint_preprocess(self, img: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -168,7 +171,9 @@ class AOTInpainter(InpainterBase):
         mask_original[mask_original >= 127] = 1
         mask_original = mask_original[:, :, None]
 
-        new_shape = self.inpaint_size if max(img.shape[0: 2]) > self.inpaint_size else None
+        new_shape = (
+            self.inpaint_size if max(img.shape[:2]) > self.inpaint_size else None
+        )
 
         img = resize_keepasp(img, new_shape, stride=None)
         mask = resize_keepasp(mask, new_shape, stride=None)
@@ -215,11 +220,7 @@ class AOTInpainter(InpainterBase):
             param_device = self.setup_params['device']['select']
             self.model.to(param_device)
             self.device = param_device
-            if param_device == 'cuda':
-                self.inpaint_by_block = False
-            else:
-                self.inpaint_by_block = True
-
+            self.inpaint_by_block = param_device != 'cuda'
         elif param_key == 'inpaint_size':
             self.inpaint_size = int(self.setup_params['inpaint_size']['select'])
 
@@ -262,7 +263,7 @@ class LamaInpainterMPE(InpainterBase):
         else:
             self.model = LAMA_MPE
             self.model.to(self.device)
-        self.inpaint_by_block = True if self.device == 'cuda' else False
+        self.inpaint_by_block = self.device == 'cuda'
         self.inpaint_size = int(self.setup_params['inpaint_size']['select'])
 
     def inpaint_preprocess(self, img: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -273,7 +274,9 @@ class LamaInpainterMPE(InpainterBase):
         mask_original[mask_original >= 127] = 1
         mask_original = mask_original[:, :, None]
 
-        new_shape = self.inpaint_size if max(img.shape[0: 2]) > self.inpaint_size else None
+        new_shape = (
+            self.inpaint_size if max(img.shape[:2]) > self.inpaint_size else None
+        )
         # high resolution input could produce cloudy artifacts
         img = resize_keepasp(img, new_shape, stride=64)
         mask = resize_keepasp(mask, new_shape, stride=64)
@@ -327,11 +330,7 @@ class LamaInpainterMPE(InpainterBase):
             param_device = self.setup_params['device']['select']
             self.model.to(param_device)
             self.device = param_device
-            if param_device == 'cuda':
-                self.inpaint_by_block = False
-            else:
-                self.inpaint_by_block = True
-
+            self.inpaint_by_block = param_device != 'cuda'
         elif param_key == 'inpaint_size':
             self.inpaint_size = int(self.setup_params['inpaint_size']['select'])
 

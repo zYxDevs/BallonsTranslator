@@ -22,12 +22,9 @@ def propagate_user_edit(src_edit: Union[TransTextEdit, TextBlkItem], target_edit
     new_count = src_edit.document().characterCount()
     removed = ori_count + len(added_text) - new_count
 
-    new_editblock = False
-    if input_method_used or added_text not in PUNSET_HALF:
-        new_editblock = True
-
+    new_editblock = input_method_used or added_text not in PUNSET_HALF
     cursor = target_edit.textCursor()
-    if len(added_text) > 0:
+    if added_text != "":
         cursor.setPosition(pos)
         if removed > 0:
             cursor.setPosition(pos + removed, QTextCursor.MoveMode.KeepAnchor)
@@ -110,8 +107,7 @@ class ApplyEffectCommand(QUndoCommand):
         self.items = items
         self.old_fmt_lst: List[FontFormat] = []
         self.new_fmt = fontformat
-        for item in items:
-            self.old_fmt_lst.append(item.get_fontformat())
+        self.old_fmt_lst.extend(item.get_fontformat() for item in items)
 
     def redo(self):
         for item in self.items:
@@ -379,9 +375,8 @@ class PageReplaceAllCommand(QUndoCommand):
             if redo_blk:
                 blkitem = self.sw.textblk_item_list[edit.idx]
                 self.blkitem_list.append(blkitem)
-            span_list = [[matched.start, matched.end] for matched in curpos_lst]
-            sel_list = doc_replace(edit.document(), span_list, replace)
-            if redo_blk:
+                span_list = [[matched.start, matched.end] for matched in curpos_lst]
+                sel_list = doc_replace(edit.document(), span_list, replace)
                 doc_replace_no_shift(blkitem.document(), sel_list, replace)
                 blkitem.updateUndoSteps()
 
@@ -451,7 +446,7 @@ class GlobalRepalceAllCommand(QUndoCommand):
             blk.translation = trans_dict['replace']
             blk.rich_text = trans_dict['replace_html']
 
-        for src_dict in self.src_list:
+        for _ in self.src_list:
             blk: TextBlock = self.proj.pages[trans_dict['pagename']][trans_dict['idx']]
             blk.text = trans_dict['replace']
 
@@ -471,7 +466,7 @@ class GlobalRepalceAllCommand(QUndoCommand):
             blk.translation = trans_dict['ori']
             blk.rich_text = trans_dict['ori_html']
 
-        for src_dict in self.src_list:
+        for _ in self.src_list:
             blk: TextBlock = self.proj.pages[trans_dict['pagename']][trans_dict['idx']]
             blk.text = trans_dict['ori']
 

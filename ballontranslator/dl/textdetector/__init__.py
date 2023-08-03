@@ -13,11 +13,14 @@ class TextDetectorBase(ModuleParamParser):
 
     def __init__(self, **setup_params) -> None:
         super().__init__(**setup_params)
-        self.name = ''
-        for key in TEXTDETECTORS.module_dict:
-            if TEXTDETECTORS.module_dict[key] == self.__class__:
-                self.name = key
-                break
+        self.name = next(
+            (
+                key
+                for key in TEXTDETECTORS.module_dict
+                if TEXTDETECTORS.module_dict[key] == self.__class__
+            ),
+            '',
+        )
         self.setup_detector()
 
     def setup_detector(self):
@@ -33,9 +36,7 @@ CTD_ONNX_PATH = 'data/models/comictextdetector.pt.onnx'
 CTD_TORCH_PATH = 'data/models/comictextdetector.pt'
 
 def load_ctd_model(model_path, device, detect_size=1024) -> CTDModel:
-    model = CTDModel(model_path, detect_size=detect_size, device=device)
-    
-    return model
+    return CTDModel(model_path, detect_size=detect_size, device=device)
 
 @register_textdetectors('ctd')
 class ComicTextDetector(TextDetectorBase):
@@ -69,16 +70,16 @@ class ComicTextDetector(TextDetectorBase):
         global CTDMODEL_TORCH, CTDMODEL_ONNX
         self.device = self.setup_params['device']['select']
         self.detect_size = int(self.setup_params['detect_size']['select'])
-        if self.device != 'cpu':
-            if CTDMODEL_TORCH is None:
-                self.detector = CTDMODEL_TORCH = load_ctd_model(CTD_TORCH_PATH, self.device, self.detect_size)
-            else:
-                self.detector = CTDMODEL_TORCH
-        else:
+        if self.device == 'cpu':
             if CTDMODEL_ONNX is None:
                 self.detector = CTDMODEL_ONNX = load_ctd_model(CTD_ONNX_PATH, self.device, self.detect_size)
             else:
                 self.detector = CTDMODEL_ONNX
+
+        elif CTDMODEL_TORCH is None:
+            self.detector = CTDMODEL_TORCH = load_ctd_model(CTD_TORCH_PATH, self.device, self.detect_size)
+        else:
+            self.detector = CTDMODEL_TORCH
 
     def detect(self, img: np.ndarray) -> Tuple[np.ndarray, List[TextBlock]]:
 

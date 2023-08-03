@@ -37,9 +37,9 @@ class Registry:
 
     def __init__(self, name, build_func=None, parent=None, scope=None):
         self._name = name
-        self._module_dict = dict()
-        self._children = dict()
-        
+        self._module_dict = {}
+        self._children = {}
+
         # self._scope = self.infer_scope() if scope is None else scope
 
         # self.build_func will be set with the following priority:
@@ -67,10 +67,7 @@ class Registry:
         return self.get(key) is not None
 
     def __repr__(self):
-        format_str = self.__class__.__name__ + \
-                     f'(name={self._name}, ' \
-                     f'items={self._module_dict})'
-        return format_str
+        return f'{self.__class__.__name__}(name={self._name}, items={self._module_dict})'
 
     @staticmethod
     def infer_scope():
@@ -148,15 +145,13 @@ class Registry:
             if real_key in self._module_dict:
                 return self._module_dict[real_key]
         else:
-            # get from self._children
             if scope in self._children:
                 return self._children[scope].get(real_key)
-            else:
-                # goto root
-                parent = self.parent
-                while parent.parent is not None:
-                    parent = parent.parent
-                return parent.get(key)
+            # goto root
+            parent = self.parent
+            while parent.parent is not None:
+                parent = parent.parent
+            return parent.get(key)
 
     # def build(self, *args, **kwargs):
     #     return self.build_func(*args, **kwargs, registry=self)

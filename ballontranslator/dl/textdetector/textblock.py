@@ -188,9 +188,9 @@ class TextBlock(object):
 
     def normalizd_width_list(self) -> List[float]:
         angled, center, polygons = self.unrotated_polygons()
-        width_list = []
-        for polygon in polygons:
-            width_list.append((polygon[[2, 4]] - polygon[[0, 6]]).sum())
+        width_list = [
+            (polygon[[2, 4]] - polygon[[0, 6]]).sum() for polygon in polygons
+        ]
         width_list = np.array(width_list)
         width_list = width_list / np.sum(width_list)
         return width_list.tolist()
@@ -218,10 +218,9 @@ class TextBlock(object):
         return self.lines[idx]
 
     def to_dict(self):
-        blk_dict = copy.deepcopy(vars(self))
-        return blk_dict
+        return copy.deepcopy(vars(self))
 
-    def get_transformed_region(self, img: np.ndarray, idx: int, textheight: int, maxwidth: int = None) -> np.ndarray :
+    def get_transformed_region(self, img: np.ndarray, idx: int, textheight: int, maxwidth: int = None) -> np.ndarray:
         direction = 'v' if self.vertical else 'h'
         src_pts = np.array(self.lines[idx], dtype=np.float64)
         im_h, im_w = img.shape[:2]
@@ -236,23 +235,23 @@ class TextBlock(object):
             return np.zeros((textheight, textheight, 3), dtype=np.uint8)
         ratio = norm_v / norm_h
 
-        if direction == 'h' :
-            h = int(textheight)
+        if direction == 'h':
+            h = textheight
             w = int(round(textheight / ratio))
             dst_pts = np.array([[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]]).astype(np.float32)
             M, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
             if M is None:
                 print('invalid textpolygon to target img')
-                return np.zeros((textheight, textheight, 3), dtype=np.uint8)
+                return np.zeros((h, h, 3), dtype=np.uint8)
             region = cv2.warpPerspective(img, M, (w, h))
-        elif direction == 'v' :
-            w = int(textheight)
+        elif direction == 'v':
             h = int(round(textheight * ratio))
+            w = textheight
             dst_pts = np.array([[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]]).astype(np.float32)
             M, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
             if M is None:
                 print('invalid textpolygon to target img')
-                return np.zeros((textheight, textheight, 3), dtype=np.uint8)
+                return np.zeros((w, w, 3), dtype=np.uint8)
             region = cv2.warpPerspective(img, M, (w, h))
             region = cv2.rotate(region, cv2.ROTATE_90_COUNTERCLOCKWISE)
 
@@ -290,18 +289,14 @@ class TextBlock(object):
         num_lines = len(self.lines)
         frgb = np.array([self.fg_r, self.fg_g, self.fg_b])
         brgb = np.array([self.bg_r, self.bg_g, self.bg_b])
-        if self.accumulate_color:
-            if num_lines > 0:
-                frgb = (frgb / num_lines).astype(np.int32)
-                brgb = (brgb / num_lines).astype(np.int32)
-                if bgr:
-                    return frgb[::-1], brgb[::-1]
-                else:
-                    return frgb, brgb
-            else:
-                return [0, 0, 0], [0, 0, 0]
-        else:
+        if not self.accumulate_color:
             return frgb, brgb
+        if num_lines > 0:
+            frgb = (frgb / num_lines).astype(np.int32)
+            brgb = (brgb / num_lines).astype(np.int32)
+            return (frgb[::-1], brgb[::-1]) if bgr else (frgb, brgb)
+        else:
+            return [0, 0, 0], [0, 0, 0]
 
     def xywh(self):
         x, y, w, h = self.xyxy
@@ -318,14 +313,11 @@ class TextBlock(object):
             return 1
         angled, center, polygons = self.unrotated_polygons()
         polygons = polygons.reshape(-1, 4, 2)
-        
+
         left_std = np.std(polygons[:, 0, 0])
         # right_std = np.std(polygons[:, 1, 0])
         center_std = np.std((polygons[:, 0, 0] + polygons[:, 1, 0]) / 2)
-        if left_std < center_std:
-            return 0
-        else:
-            return 1
+        return 0 if left_std < center_std else 1
 
     def target_lang(self):
         return self.target_lang
@@ -333,9 +325,7 @@ class TextBlock(object):
     @property
     def stroke_width(self):
         diff = color_difference(*self.get_font_colors())
-        if diff > 15:
-            return self.default_stroke_width
-        return 0
+        return self.default_stroke_width if diff > 15 else 0
 
     def adjust_pos(self, dx: int, dy: int):
         self.xyxy[0] += dx
@@ -347,7 +337,7 @@ class TextBlock(object):
             self._bounding_rect[1] += dy
 
 def sort_textblk_list(blk_list: List[TextBlock], im_w: int, im_h: int) -> List[TextBlock]:
-    if len(blk_list) == 0:
+    if not blk_list:
         return blk_list
     num_ja = 0
     xyxy = []
@@ -364,10 +354,7 @@ def sort_textblk_list(blk_list: List[TextBlock], im_w: int, im_h: int) -> List[T
     img_area = im_h * im_w
     center_x = (xyxy[:, 0] + xyxy[:, 2]) / 2
     if flip_lr:
-        if im_w != im_oriw:
-            center_x = im_oriw - center_x
-        else:
-            center_x = im_w - center_x
+        center_x = im_oriw - center_x if im_w != im_oriw else im_w - center_x
     grid_x = (center_x / im_w * num_gridx).astype(np.int32)
     center_y = (xyxy[:, 1] + xyxy[:, 3]) / 2
     grid_y = (center_y / im_h * num_gridy).astype(np.int32)
@@ -375,7 +362,7 @@ def sort_textblk_list(blk_list: List[TextBlock], im_w: int, im_h: int) -> List[T
     grid_weights = grid_indices * img_area + 1.2 * (center_x - grid_x * im_w / num_gridx) + (center_y - grid_y * im_h / num_gridy)
     if im_w != im_oriw:
         grid_weights[np.where(grid_x >= num_gridx)] += img_area * num_gridy * num_gridx
-    
+
     for blk, weight in zip(blk_list, grid_weights):
         blk.sort_weight = weight
     blk_list.sort(key=lambda blk: blk.sort_weight)
@@ -391,10 +378,7 @@ def examine_textblk(blk: TextBlock, im_w: int, im_h: int, sort: bool = False) ->
     v = np.sum(vec_v, axis=0)
     h = np.sum(vec_h, axis=0)
     norm_v, norm_h = np.linalg.norm(v), np.linalg.norm(h)
-    if blk.language == 'ja':
-        vertical = norm_v > norm_h
-    else:
-        vertical = norm_v > norm_h * 2
+    vertical = norm_v > norm_h if blk.language == 'ja' else norm_v > norm_h * 2
     # calcuate distance between textlines and origin 
     if vertical:
         primary_vec, primary_norm = v, norm_v
@@ -404,7 +388,7 @@ def examine_textblk(blk: TextBlock, im_w: int, im_h: int, sort: bool = False) ->
         primary_vec, primary_norm = h, norm_h
         distance_vectors = center_pnts - np.array([[0, 0]], dtype=np.float64)
         font_size = int(round(norm_v / len(lines)))
-    
+
     rotation_angle = int(math.atan2(primary_vec[1], primary_vec[0]) / math.pi * 180)     # rotation angle of textlines
     distance = np.linalg.norm(distance_vectors, axis=1)     # distance between textlinecenters and origin
     rad_matrix = np.arccos(np.einsum('ij, j->i', distance_vectors, primary_vec) / (distance * primary_norm))
@@ -464,7 +448,7 @@ def merge_textlines(blk_list: List[TextBlock]) -> List[TextBlock]:
     for ii, current_blk in enumerate(blk_list):
         if current_blk.merged:
             continue
-        for jj, blk in enumerate(blk_list[ii+1:]):
+        for blk in blk_list[ii+1:]:
             try_merge_textline(current_blk, blk)
         merged_list.append(current_blk)
     for blk in merged_list:
@@ -503,12 +487,11 @@ def split_textblk(blk: TextBlock):
     return textblock_splitted, sub_blk_list
 
 def group_output(blks, lines, im_w, im_h, mask=None, sort_blklist=True) -> List[TextBlock]:
-    blk_list: List[TextBlock] = []
     scattered_lines = {'ver': [], 'hor': []}
-    for bbox, cls, conf in zip(*blks):
-        # cls could give wrong result
-        blk_list.append(TextBlock(bbox, language=LANG_LIST[cls]))
-
+    blk_list: List[TextBlock] = [
+        TextBlock(bbox, language=LANG_LIST[cls])
+        for bbox, cls, conf in zip(*blks)
+    ]
     # step1: filter & assign lines to textblocks
     bbox_score_thresh = 0.4
     mask_score_thresh = 0.1
@@ -549,13 +532,11 @@ def group_output(blks, lines, im_w, im_h, mask=None, sort_blklist=True) -> List[
             xywh = np.array([[bx1, by1, bx2-bx1, by2-by1]])
             blk.lines = xywh2xyxypoly(xywh).reshape(-1, 4, 2).tolist()
         examine_textblk(blk, im_w, im_h, sort=True)
-        
+
         # split manga text if there is a distance gap
         textblock_splitted = False
         if len(blk.lines) > 1:
-            if blk.language == 'ja':
-                textblock_splitted = True
-            elif blk.vertical:
+            if blk.language == 'ja' or blk.vertical:
                 textblock_splitted = True
         if textblock_splitted:
             textblock_splitted, sub_blk_list = split_textblk(blk)
@@ -588,7 +569,7 @@ def group_output(blks, lines, im_w, im_h, mask=None, sort_blklist=True) -> List[
             lines[..., 1] = np.clip(lines[..., 1], 0, im_h-1)
             blk.lines = lines.astype(np.int64).tolist()
             blk.font_size += expand_size
-            
+
     return final_blk_list
 
 def visualize_textblocks(canvas, blk_list:  List[TextBlock]):

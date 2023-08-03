@@ -433,25 +433,22 @@ class TitleBar(Widget):
     def onMaxBtnClicked(self):
         if self.mainwindow.isMaximized():
             self.mainwindow.showNormal()
-            self.mainwindow.updateGeometry()
         else:
             self.mainwindow.showMaximized()
-            self.mainwindow.updateGeometry()
+
+        self.mainwindow.updateGeometry()
 
     def onMinBtnClicked(self):
         self.mainwindow.showMinimized()
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
 
-        if C.FLAG_QT6:
-            g_pos = event.globalPosition().toPoint()
-        else:
-            g_pos = event.globalPos()
+        g_pos = event.globalPosition().toPoint() if C.FLAG_QT6 else event.globalPos()
         if event.button() == Qt.MouseButton.LeftButton:
-            if not self.mainwindow.isMaximized() and \
-                event.pos().y() < WINDOW_BORDER_WIDTH:
-                pass
-            else:
+            if (
+                self.mainwindow.isMaximized()
+                or event.pos().y() >= WINDOW_BORDER_WIDTH
+            ):
                 self.mPos = event.pos()
                 self.mPosGlobal = g_pos
         return super().mousePressEvent(event)
@@ -462,10 +459,7 @@ class TitleBar(Widget):
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         if self.mPos is not None:
-            if C.FLAG_QT6:
-                g_pos = event.globalPosition().toPoint()
-            else:
-                g_pos = event.globalPos()
+            g_pos = event.globalPosition().toPoint() if C.FLAG_QT6 else event.globalPos()
             startSystemMove(self.window(), g_pos)
 
     def hideEvent(self, e) -> None:
@@ -477,21 +471,21 @@ class TitleBar(Widget):
         return super().leaveEvent(e)
 
     def setTitleContent(self, proj_name: str = None, page_name: str = None, save_state: str = None):
-        max_proj_len = 50
-        max_page_len = 50
         if proj_name is not None:
+            max_proj_len = 50
             if len(proj_name) > max_proj_len:
-                proj_name = proj_name[:max_proj_len-3] + '...'
+                proj_name = f'{proj_name[:max_proj_len - 3]}...'
             self.proj_name = proj_name
         if page_name is not None:
+            max_page_len = 50
             if len(page_name) > max_page_len:
-                page_name = page_name[:max_page_len-3] + '...'
+                page_name = f'{page_name[:max_page_len - 3]}...'
             self.page_name = page_name
         if save_state is not None:
             self.save_state = save_state
-        title = self.proj_name + ' - ' + self.page_name
+        title = f'{self.proj_name} - {self.page_name}'
         if self.save_state != '':
-            title += ' - '  + self.save_state
+            title += f' - {self.save_state}'
         self.titleLabel.setText(title)
 
 

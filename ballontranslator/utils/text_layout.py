@@ -48,7 +48,7 @@ def layout_lines_aligncenter(
     spacing: int = 0,
     delimiter: str = ' ',
     max_central_width: float = np.inf,
-    word_break: bool = False)->List[Line]:
+    word_break: bool = False) -> List[Line]:
 
     centroid_x, centroid_y = centroid
 
@@ -56,7 +56,7 @@ def layout_lines_aligncenter(
     mask = 255 - mask
     # centroid_y = int(m['m01'] / m['m00'])
     # centroid_x = int(m['m10'] / m['m00'])
-    
+
     # layout the central line, the center word is approximately aligned with the centroid of the mask
     num_words = len(words)
     len_left, len_right = [], []
@@ -104,12 +104,15 @@ def layout_lines_aligncenter(
                     right_valid = True
 
         insert_left = False
-        if left_valid and right_valid:
-            if sum_left > sum_right:
-                insert_left = True
-        elif left_valid:
+        if (
+            left_valid
+            and right_valid
+            and sum_left > sum_right
+            or (not left_valid or not right_valid)
+            and left_valid
+        ):
             insert_left = True
-        elif not right_valid:
+        elif not left_valid and not right_valid:
             break
 
         if insert_left:
@@ -216,7 +219,7 @@ def layout_lines_aligncenter(
     #     cv2.rectangle(rbgmsk, (line.pos_x, line.pos_y), (line.pos_x + line.length, line.pos_y + line_height), (0, 255, 0))
     # cv2.imshow('mask', rbgmsk)
     # cv2.waitKey(0)
-    
+
     return lines
 
 def layout_lines_alignleft(

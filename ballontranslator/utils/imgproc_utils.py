@@ -16,15 +16,14 @@ def union_area(bboxa, bboxb):
     y1 = max(bboxa[1], bboxb[1])
     x2 = min(bboxa[2], bboxb[2])
     y2 = min(bboxa[3], bboxb[3])
-    if y2 < y1 or x2 < x1:
-        return -1
-    return (y2 - y1) * (x2 - x1)
+    return -1 if y2 < y1 or x2 < x1 else (y2 - y1) * (x2 - x1)
 
 def get_yololabel_strings(clslist, labellist):
-    content = ''
-    for cls, xywh in zip(clslist, labellist):
-        content += str(int(cls)) + ' ' + ' '.join([str(e) for e in xywh]) + '\n'
-    if len(content) != 0:
+    content = ''.join(
+        f'{int(cls)} ' + ' '.join([str(e) for e in xywh]) + '\n'
+        for cls, xywh in zip(clslist, labellist)
+    )
+    if content != "":
         content = content[:-1]
     return content
 
@@ -72,7 +71,7 @@ def rotate_polygons(center, polygons, rotation, new_center=None, to_int=True):
     rotation = np.deg2rad(rotation)
     s, c = np.sin(rotation), np.cos(rotation)
     polygons = polygons.astype(np.float32)
-    
+
     polygons[:, 1::2] -= center[1]
     polygons[:, ::2] -= center[0]
     rotated = np.copy(polygons)
@@ -80,9 +79,7 @@ def rotate_polygons(center, polygons, rotation, new_center=None, to_int=True):
     rotated[:, ::2] = polygons[:, 1::2] * s + polygons[:, ::2] * c
     rotated[:, 1::2] += new_center[1]
     rotated[:, ::2] += new_center[0]
-    if to_int:
-        return rotated.astype(np.int64)
-    return rotated
+    return rotated.astype(np.int64) if to_int else rotated
 
 def letterbox(im, new_shape=(640, 640), color=(0, 0, 0), auto=False, scaleFill=False, scaleup=True, stride=128):
     # Resize and pad image while meeting stride-multiple constraints
@@ -120,12 +117,11 @@ def letterbox(im, new_shape=(640, 640), color=(0, 0, 0), auto=False, scaleFill=F
 def resize_keepasp(im, new_shape=640, scaleup=True, interpolation=cv2.INTER_LINEAR, stride=None):
     shape = im.shape[:2]  # current shape [height, width]
 
-    if new_shape is not None:
-        if not isinstance(new_shape, tuple):
-            new_shape = (new_shape, new_shape)
-    else:
+    if new_shape is None:
         new_shape = shape
 
+    elif not isinstance(new_shape, tuple):
+        new_shape = (new_shape, new_shape)
     # Scale ratio (new / old)
     r = min(new_shape[0] / shape[0], new_shape[1] / shape[1])
     if not scaleup:  # only scale down, do not scale up (for better val mAP)
@@ -135,16 +131,10 @@ def resize_keepasp(im, new_shape=640, scaleup=True, interpolation=cv2.INTER_LINE
 
     if stride is not None:
         h, w = new_unpad
-        if h % stride != 0 :
-            new_h = (stride - (h % stride)) + h
-        else :
-            new_h = h
-        if w % stride != 0 :
-            new_w = (stride - (w % stride)) + w
-        else :
-            new_w = w
+        new_h = (stride - (h % stride)) + h if h % stride != 0 else h
+        new_w = (stride - (w % stride)) + w if w % stride != 0 else w
         new_unpad = (new_h, new_w)
-        
+
     if shape[::-1] != new_unpad:  # resize
         im = cv2.resize(im, new_unpad, interpolation=interpolation)
     return im
@@ -226,7 +216,7 @@ def rotate_image(mat: np.ndarray, angle: float) -> np.ndarray:
     rotation_mat = cv2.getRotationMatrix2D(image_center, angle, 1.)
 
     # rotation calculates the cos and sin, taking absolutes of those.
-    abs_cos = abs(rotation_mat[0,0]) 
+    abs_cos = abs(rotation_mat[0,0])
     abs_sin = abs(rotation_mat[0,1])
 
     # find the new width and height bounds
@@ -237,9 +227,7 @@ def rotate_image(mat: np.ndarray, angle: float) -> np.ndarray:
     rotation_mat[0, 2] += bound_w/2 - image_center[0]
     rotation_mat[1, 2] += bound_h/2 - image_center[1]
 
-    # rotate image with the new bounds and translated rotation matrix
-    rotated_mat = cv2.warpAffine(mat, rotation_mat, (bound_w, bound_h))
-    return rotated_mat
+    return cv2.warpAffine(mat, rotation_mat, (bound_w, bound_h))
 
 def color_difference(rgb1: List, rgb2: List) -> float:
     # https://en.wikipedia.org/wiki/Color_difference#CIE76

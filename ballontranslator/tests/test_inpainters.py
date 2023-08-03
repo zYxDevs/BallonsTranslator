@@ -36,7 +36,7 @@ def test_inpainter(inpainter: InpainterBase, proj: ProjImgTrans, inpaint_by_bloc
             cv2.imshow('mask', mask)
             cv2.imshow('inpainted', inpainted)
             cv2.waitKey(0)
-        imwrite('tmp/inpaint_test/{}_inpainted.png'.format(page_name), inpainted)
+        imwrite(f'tmp/inpaint_test/{page_name}_inpainted.png', inpainted)
 
     print(f'Time cost: {time_cost}, avg: {time_cost / len(proj.pages)}')
 

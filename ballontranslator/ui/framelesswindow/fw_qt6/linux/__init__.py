@@ -44,7 +44,7 @@ class LinuxFramelessWindow(QWidget):
 
     def eventFilter(self, obj, event):
         et = event.type()
-        if et != QEvent.Type.MouseButtonPress and et != QEvent.Type.MouseMove:
+        if et not in [QEvent.Type.MouseButtonPress, QEvent.Type.MouseMove]:
             return False
 
         edges = 0
@@ -52,7 +52,7 @@ class LinuxFramelessWindow(QWidget):
         if pos.x() < self.BORDER_WIDTH:
             edges = edges | Qt.Edge.LeftEdge if edges != 0 else Qt.Edge.LeftEdge
         if pos.x() >= self.width()-self.BORDER_WIDTH:
-            edges = edges | Qt.Edge.RightEdge if edges != 0 else Qt.Edge.RightEdge 
+            edges = edges | Qt.Edge.RightEdge if edges != 0 else Qt.Edge.RightEdge
         if pos.y() < self.BORDER_WIDTH:
             edges = edges | Qt.Edge.TopEdge if edges != 0 else Qt.Edge.TopEdge
         if pos.y() >= self.height()-self.BORDER_WIDTH:

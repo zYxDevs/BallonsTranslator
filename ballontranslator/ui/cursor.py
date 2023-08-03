@@ -38,7 +38,7 @@ class RotateCursorList:
         return QCursor(QPixmap(r'data/icons/rotate_cursor7.png'))
 
     def __getitem__(self, idx):
-        return self.__getattribute__('Cursor' + str(idx))
+        return self.__getattribute__(f'Cursor{str(idx)}')
         
 resizeCursorList = [
     Qt.CursorShape.SizeFDiagCursor, 

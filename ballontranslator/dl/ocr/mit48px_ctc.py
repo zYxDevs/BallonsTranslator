@@ -172,12 +172,9 @@ class ResNet(nn.Module):
                           kernel_size=1, stride=stride, bias=False),
             )
 
-        layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
+        layers = [block(self.inplanes, planes, stride, downsample)]
         self.inplanes = planes * block.expansion
-        for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
-
+        layers.extend(block(self.inplanes, planes) for _ in range(1, blocks))
         return nn.Sequential(*layers)
 
     def forward(self, x):
@@ -301,32 +298,33 @@ class OCR(nn.Module) :
         pred_color_values = self.color_pred1(feats)
         return self.decode_ctc_top1(pred_char_logits, pred_color_values, blank, verbose = verbose)
 
-    def decode_ctc_top1(self, pred_char_logits, pred_color_values, blank, verbose = False) -> List[List[Tuple[str, float, int, int, int, int, int, int]]] :
-        pred_chars: List[List[Tuple[str, float, int, int, int, int, int, int]]] = []
-        for _ in range(pred_char_logits.size(0)) :
-            pred_chars.append([])
+    def decode_ctc_top1(self, pred_char_logits, pred_color_values, blank, verbose = False) -> List[List[Tuple[str, float, int, int, int, int, int, int]]]:
+        pred_chars: List[List[Tuple[str, float, int, int, int, int, int, int]]] = [
+            [] for _ in range(pred_char_logits.size(0))
+        ]
         logprobs = pred_char_logits.log_softmax(2)
         _, preds_index = logprobs.max(2)
         preds_index = preds_index.cpu()
         pred_color_values = pred_color_values.cpu().clamp_(0, 1)
-        for b in range(pred_char_logits.size(0)) :
+        for b in range(pred_char_logits.size(0)):
             if verbose :
                 print('------------------------------')
             last_ch = blank
-            for t in range(pred_char_logits.size(1)) :
+            for t in range(pred_char_logits.size(1)):
                 pred_ch = preds_index[b, t]
-                if pred_ch != last_ch and pred_ch != blank :
+                if pred_ch not in [last_ch, blank]:
                     lp = logprobs[b, t, pred_ch].item()
-                    if verbose :
-                        if lp < math.log(0.9) :
+                    if verbose:
+                        if lp < math.log(0.9):
                             top5 = torch.topk(logprobs[b, t], 5)
                             top5_idx = top5.indices
                             top5_val = top5.values
-                            r = ''
-                            for i in range(5) :
-                                r += f'{self.dictionary[top5_idx[i]]}: {math.exp(top5_val[i])}, '
+                            r = ''.join(
+                                f'{self.dictionary[top5_idx[i]]}: {math.exp(top5_val[i])}, '
+                                for i in range(5)
+                            )
                             print(r)
-                        else :
+                        else:
                             print(f'{self.dictionary[pred_ch]}: {math.exp(lp)}')
                     pred_chars[b].append((
                         pred_ch,
@@ -341,19 +339,19 @@ class OCR(nn.Module) :
                 last_ch = pred_ch
         return pred_chars
 
-    def eval_ocr(self, input_lengths, target_lengths, pred_char_logits, pred_color_values, gt_char_index, gt_color_values, blank, blank1) :
+    def eval_ocr(self, input_lengths, target_lengths, pred_char_logits, pred_color_values, gt_char_index, gt_color_values, blank, blank1):
         correct_char = 0
         total_char = 0
         color_diff = 0
         color_diff_dom = 0
         _, preds_index = pred_char_logits.max(2)
         pred_chars = torch.zeros_like(gt_char_index).cpu()
-        for b in range(pred_char_logits.size(0)) :
+        for b in range(pred_char_logits.size(0)):
             last_ch = blank
             i = 0
-            for t in range(input_lengths[b]) :
+            for t in range(input_lengths[b]):
                 pred_ch = preds_index[b, t]
-                if pred_ch != last_ch and pred_ch != blank :
+                if pred_ch not in [last_ch, blank]:
                     total_char += 1
                     if gt_char_index[b, i] == pred_ch :
                         correct_char += 1
@@ -381,14 +379,11 @@ class AvgMeter() :
         self.sum = 0
         self.count = 0
 
-    def __call__(self, val = None) :
+    def __call__(self, val = None):
         if val is not None :
             self.sum += val
             self.count += 1
-        if self.count > 0 :
-            return self.sum / self.count
-        else :
-            return 0
+        return self.sum / self.count if self.count > 0 else 0
 
 class OCR48pxCTC:
 

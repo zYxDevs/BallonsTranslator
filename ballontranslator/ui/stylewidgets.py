@@ -70,9 +70,9 @@ class TaskProgressBar(Widget):
         if self.description:
             msg = self.description + msg
         if len(msg) > self.text_len - 3:
-            msg = msg[:self.text_len - 3] + '...'
+            msg = f'{msg[:self.text_len - 3]}...'
         elif len(msg) < self.text_len:
-            msg = msg + ' ' * (self.text_len - len(msg))
+            msg += ' ' * (self.text_len - len(msg))
         self.textlabel.setText(msg)
         self.progressbar.setValue(progress)
 
@@ -201,7 +201,7 @@ class ColorPicker(QLabel):
         self.color = color
         r, g, b, a = color.getRgb()
         rgba = f'rgba({r}, {g}, {b}, {a})'
-        self.setStyleSheet("background-color: " + rgba)
+        self.setStyleSheet(f"background-color: {rgba}")
 
     def rgb(self) -> List:
         color = self.color

@@ -30,7 +30,7 @@ class StrokeImgItem(QGraphicsItem):
         pen = QPen(pen)
         if shape == PenShape.Rectangle:
             pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
-            
+
         self.pen = pen
         self._d = d = pen.widthF()
         self._d_rect = d // 32
@@ -46,7 +46,7 @@ class StrokeImgItem(QGraphicsItem):
             pen.setWidthF(0)
         self.painter.setPen(pen)
         self.painter.setBrush(pen.color())
-        
+
         self.setBoundingRegionGranularity(0)
         self.cur_point = point
         self._br = QRectF(0, 0, size.width(), size.height())
@@ -54,10 +54,7 @@ class StrokeImgItem(QGraphicsItem):
 
         min_x = self.cur_point.x() - self._r
         min_y = self.cur_point.y() - self._r
-        if shape == PenShape.Circle:
-            self._line_to(self.cur_point, None)
-        else:
-            self._line_to(self.cur_point, None)
+        self._line_to(self.cur_point, None)
         rect = QRectF(min_x, min_y, self._d, self._d)
         self.init_rect = rect
         self.update(rect)
@@ -70,7 +67,7 @@ class StrokeImgItem(QGraphicsItem):
         img_array = pixmap2ndarray(self._img, True)
         ar = cv2.boundingRect(cv2.findNonZero(img_array[..., -1]))
         img_array = img_array[ar[1]: ar[1] + ar[3], ar[0]: ar[0] + ar[2]]
-        if not (ar[2] > 0 and ar[3] > 0):
+        if ar[2] <= 0 or ar[3] <= 0:
             return None, None, None
         if mask_only:
             img_array = img_array[..., -1]

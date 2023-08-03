@@ -105,11 +105,11 @@ class TextBlkItem(QGraphicsTextItem):
                         added_text = self.input_method_text
                         change_from = self.input_method_from
                         input_method_used = True
-            
+
                     elif self.change_added > 0:
                         len_text = len(self.toPlainText())
                         cursor = self.textCursor()
-                        
+
                         # if self.change_added >  len_text:
                         #     self.change_added = 1
                         #     change_from = self.textCursor().position() - 1
@@ -122,10 +122,10 @@ class TextBlkItem(QGraphicsTextItem):
                             cursor.setPosition(change_from)
                             cursor.setPosition(change_from + self.change_added, QTextCursor.MoveMode.KeepAnchor)
                             added_text = cursor.selectedText()
-                            if added_text == '…' or added_text == '—':
-                                    self.change_added = 2
-                                    change_from -= 1
-                                    
+                            if added_text in ['…', '—']:
+                                self.change_added = 2
+                                change_from -= 1
+
                         cursor.setPosition(change_from)
                         cursor.setPosition(change_from + self.change_added, QTextCursor.MoveMode.KeepAnchor) 
 
@@ -230,26 +230,22 @@ class TextBlkItem(QGraphicsTextItem):
             blk.lines = xywh2xyxypoly(xywh).reshape(-1, 4, 2).tolist()
         self.setVertical(blk.vertical)
         self.setRect(blk.bounding_rect())
-        
+
         if blk.angle != 0:
             self.setRotation(blk.angle)
-        
-        set_char_fmt = False
-        if blk.translation:
-            set_char_fmt = True
 
+        set_char_fmt = bool(blk.translation)
         font_fmt = FontFormat()
         font_fmt.from_textblock(blk)
         if set_format:
             self.set_fontformat(font_fmt, set_char_format=set_char_fmt, set_stroke_width=False, set_effect=False)
 
-        if not blk.rich_text:
-            if blk.translation:
-                self.setPlainText(blk.translation)
-        else:
+        if blk.rich_text:
             self.setHtml(blk.rich_text)
             self.letter_spacing = 1.
             self.setLetterSpacing(font_fmt.letter_spacing, repaint_background=False)
+        elif blk.translation:
+            self.setPlainText(blk.translation)
         self.update_effect(font_fmt, repaint=False)
         self.setStrokeWidth(font_fmt.stroke_width, repaint=False)
         self.repaint_background()
@@ -332,9 +328,7 @@ class TextBlkItem(QGraphicsTextItem):
             x = min(max(0, x), max_w)
             x1 = x + w
             w = min(max_w, x1) - x
-        if qrect:
-            return QRectF(x, y, w, h)
-        return [int(x), int(y), int(w), int(h)]
+        return QRectF(x, y, w, h) if qrect else [int(x), int(y), int(w), int(h)]
 
     def shape(self) -> QPainterPath:
         path = QPainterPath()
@@ -369,15 +363,14 @@ class TextBlkItem(QGraphicsTextItem):
             self.blk.vertical = vertical
 
         valid_layout = True
-        if self.layout is not None:
-            if self.is_vertical == vertical:
-                return
-        else:
+        if self.layout is None:
             valid_layout = False
 
+        elif self.is_vertical == vertical:
+            return
         if valid_layout:
             rect = self.rect() if self.layout is not None else None
-        
+
         self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         doc = self.document()
         html = doc.toHtml()
@@ -392,7 +385,7 @@ class TextBlkItem(QGraphicsTextItem):
             layout = VerticalTextDocumentLayout(doc)
         else:
             layout = HorizontalTextDocumentLayout(doc)
-        
+
         self.layout = layout
         self.setDocument(doc)
         layout.size_enlarged.connect(self.on_document_enlarged)
@@ -401,7 +394,7 @@ class TextBlkItem(QGraphicsTextItem):
         doc.setDefaultFont(default_font)
         doc.contentsChanged.connect(self.on_content_changed)
         doc.contentsChange.connect(self.on_content_changing)
-        
+
         if valid_layout:
             layout.setMaxSize(rect.width(), rect.height())
             doc.setHtml(html)
@@ -503,10 +496,7 @@ class TextBlkItem(QGraphicsTextItem):
 
     def get_scale(self) -> float:
         tl = self.topLevelItem()
-        if tl is not None:
-            return tl.scale()
-        else:
-            return self.scale()
+        return tl.scale() if tl is not None else self.scale()
 
     def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: QWidget) -> None:
         br = self.boundingRect()
@@ -623,8 +613,7 @@ class TextBlkItem(QGraphicsTextItem):
 
     def toHtml(self) -> str:
         html = super().toHtml()
-        tables = table_pattern.findall(html)
-        if tables:
+        if tables := table_pattern.findall(html):
             _, td = td_pattern.findall(html)[0]
             html = tables[0] + td + '</body></html>'
 
