@@ -397,7 +397,7 @@ class SakuraTranslator(BaseTranslator):
             'type': 'checkbox',
         },
         'do enlarge small kana': {
-            'value': True,
+            'value': False,
             'description': 'Enlarge small kana to normal size',
             'type': 'checkbox',
         }
